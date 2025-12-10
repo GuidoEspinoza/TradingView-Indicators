@@ -1,0 +1,65 @@
+//@version=6
+indicator("Auto MACD Indicator")
+
+source = close
+useCurrentRes = input(true, title="Use Current Chart Resolution?")
+resCustom = input.timeframe("60", "Use Different Timeframe? Uncheck Box Above")
+useAutoParams = input(true, title="Auto-Adjust Parameters by Timeframe")
+smd = input(true, title="Show MacD & Signal Line? Also Turn Off Dots Below")
+sd = input(true, title="Show Dots When MacD Crosses Signal Line?")
+sh = input(true, title="Show Histogram?")
+macd_colorChange = input(true,title="Change MacD Line Color-Signal Line Cross?")
+hist_colorChange = input(true,title="MacD Histogram 4 Colors?")
+
+res = useCurrentRes ? timeframe.period : resCustom
+tfSec = timeframe.in_seconds(res)
+is1 = tfSec == 60
+is5 = tfSec == 300
+is15 = tfSec == 900
+is30 = tfSec == 1800
+is60 = tfSec == 3600
+is240 = tfSec == 14400
+
+fastLength = input.int(12, minval=1)
+slowLength = input.int(26, minval=1)
+signalLength = input.int(9, minval=1)
+fastEff = useAutoParams ? (is1 ? 6 : is5 ? 10 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : fastLength) : fastLength
+slowEff = useAutoParams ? (is1 ? 17 : is5 ? 23 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : slowLength) : slowLength
+signalEff = useAutoParams ? (is1 ? 5 : is5 ? 7 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : signalLength) : signalLength
+
+fastMA = ta.ema(source, fastEff)
+slowMA = ta.ema(source, slowEff)
+
+macd = fastMA - slowMA
+signal = ta.sma(macd, signalEff)
+hist = macd - signal
+
+outMacD = request.security(syminfo.tickerid, res, macd)
+outSignal = request.security(syminfo.tickerid, res, signal)
+outHist = request.security(syminfo.tickerid, res, hist)
+
+histA_IsUp = outHist > outHist[1] and outHist > 0
+histA_IsDown = outHist < outHist[1] and outHist > 0
+histB_IsDown = outHist < outHist[1] and outHist <= 0
+histB_IsUp = outHist > outHist[1] and outHist <= 0
+
+//MacD Color Definitions
+macd_IsAbove = outMacD >= outSignal
+macd_IsBelow = outMacD < outSignal
+
+plot_color = hist_colorChange ? histA_IsUp ? color.aqua : histA_IsDown ? color.blue : histB_IsDown ? color.red : histB_IsUp ? color.maroon : color.yellow : color.gray
+macd_color = macd_colorChange ? macd_IsAbove ? color.lime : color.red : color.red
+signal_color = macd_colorChange ? macd_IsAbove ? color.yellow : color.orange : color.lime
+
+circleYPosition = outSignal
+
+crossEvent = ta.cross(outMacD, outSignal)
+crossZeroEvent = ta.cross(outMacD, 0)
+
+plot(smd and not na(outMacD) ? outMacD : na, title="MACD", color=macd_color, linewidth=4)
+plot(smd and not na(outSignal) ? outSignal : na, title="Signal Line", color=signal_color, style=plot.style_line ,linewidth=2)
+plot(sh and not na(outHist) ? outHist : na, title="Histogram", color=plot_color, style=plot.style_histogram, linewidth=4)
+plot(sd and not na(outMacD) and not na(outSignal) and crossEvent ? circleYPosition : na, title="Cross", style=plot.style_circles, linewidth=4, color=macd_color)
+hline(0, '0 Line', linestyle=hline.style_solid, linewidth=2, color=color.white)
+alertcondition(crossEvent, "MACD Cross", "MACD crossed Signal Line")
+alertcondition(crossZeroEvent, "MACD Zero Cross", "MACD crossed 0")

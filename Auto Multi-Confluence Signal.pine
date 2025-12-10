@@ -1,0 +1,320 @@
+//@version=6
+indicator("Auto Multi-Confluence Signal", overlay=true, max_labels_count=500)
+
+// ==================== INPUTS ====================
+// Divergence Settings
+rsiLength = input.int(14, "RSI Length", group="Divergence")
+macdFast = input.int(12, "MACD Fast", group="Divergence")
+macdSlow = input.int(26, "MACD Slow", group="Divergence")
+macdSignal = input.int(9, "MACD Signal", group="Divergence")
+pivotLookback = input.int(5, "Pivot Lookback", group="Divergence")
+
+// Trend Settings
+trendMA1 = input.int(20, "Fast MA", group="Trend")
+trendMA2 = input.int(50, "Slow MA", group="Trend")
+maType = input.string("EMA", "MA Type", options=["SMA", "EMA"], group="Trend")
+
+// Momentum Settings
+momentumLength = input.int(14, "Momentum Period", group="Momentum")
+
+// Volume Settings
+volumeMA = input.int(20, "Volume MA Length", group="Volume")
+
+// Ichimoku Settings
+conversionPeriods = input.int(9, "Conversion Line", group="Ichimoku")
+basePeriods = input.int(26, "Base Line", group="Ichimoku")
+laggingSpan2Periods = input.int(52, "Leading Span B", group="Ichimoku")
+displacement = input.int(26, "Displacement", group="Ichimoku")
+
+// Signal Settings
+confluenceRequired = input.int(5, "Min Confluence (out of 6)", minval=1, maxval=6, group="Signals")
+signalMaxAge = input.int(2, "Max Bars Since Base", minval=1, group="Signals")
+showDivergence = input.bool(true, "Show Divergence", group="Signals")
+showTrendShift = input.bool(true, "Show Trend Shifts", group="Signals")
+showTable = input.bool(true, "Show Indicator Table", group="Display")
+showParamsInTable = input.bool(false, "Show Effective Params", group="Display")
+
+// Timeframe Settings
+useCurrentRes = input.bool(true, "Use Current Chart Resolution?", group="Timeframe")
+resCustom = input.string("60", "Use Different Timeframe", options=["1","5","15","30","60","240"], group="Timeframe")
+useAutoParams = input.bool(true, "Auto-Adjust Parameters by Timeframe", group="Timeframe")
+tf = useCurrentRes ? timeframe.period : resCustom
+tfSec = timeframe.in_seconds(tf)
+is1 = tfSec == 60
+is5 = tfSec == 300
+is15 = tfSec == 900
+is30 = tfSec == 1800
+is60 = tfSec == 3600
+is240 = tfSec == 14400
+
+// Effective parameters per timeframe
+rsiLenEff = useAutoParams ? (is1 ? 9 : is5 ? 13 : is15 ? 14 : is30 ? 21 : is60 ? 14 : is240 ? 21 : rsiLength) : rsiLength
+macdFastEff = useAutoParams ? (is1 ? 6 : is5 ? 10 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : macdFast) : macdFast
+macdSlowEff = useAutoParams ? (is1 ? 17 : is5 ? 23 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : macdSlow) : macdSlow
+macdSignalEff = useAutoParams ? (is1 ? 5 : is5 ? 7 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : macdSignal) : macdSignal
+trendMA1Eff = useAutoParams ? (is1 ? 10 : is5 ? 21 : is15 ? 20 : is30 ? 20 : is60 ? 50 : is240 ? 50 : trendMA1) : trendMA1
+trendMA2Eff = useAutoParams ? (is1 ? 25 : is5 ? 55 : is15 ? 50 : is30 ? 50 : is60 ? 200 : is240 ? 200 : trendMA2) : trendMA2
+momentumLengthEff = useAutoParams ? (is1 ? 8 : is5 ? 13 : is15 ? 14 : is30 ? 20 : is60 ? 20 : is240 ? 21 : momentumLength) : momentumLength
+volumeMAEff = useAutoParams ? (is1 ? 35 : is5 ? 45 : is15 ? 50 : is30 ? 60 : is60 ? 70 : is240 ? 100 : volumeMA) : volumeMA
+conversionEff = conversionPeriods
+baseEff = basePeriods
+laggingEff = laggingSpan2Periods
+displacementEff = displacement
+
+// Low timeframe RSI thresholds
+tfIsLow = is1 or is5
+rsiOSEff = tfIsLow ? (is1 ? 22 : 27) : 30
+rsiOBEff = tfIsLow ? (is1 ? 78 : 74) : 70
+
+// ==================== INDICATORS ====================
+
+// Moving Averages
+srcO = request.security(syminfo.tickerid, tf, open)
+srcH = request.security(syminfo.tickerid, tf, high)
+srcL = request.security(syminfo.tickerid, tf, low)
+srcC = request.security(syminfo.tickerid, tf, close)
+srcV = request.security(syminfo.tickerid, tf, volume)
+
+ma1 = maType == "EMA" ? ta.ema(srcC, trendMA1Eff) : ta.sma(srcC, trendMA1Eff)
+ma2 = maType == "EMA" ? ta.ema(srcC, trendMA2Eff) : ta.sma(srcC, trendMA2Eff)
+
+// RSI
+rsi = ta.rsi(srcC, rsiLenEff)
+
+// MACD
+[macdLine, signalLine, macdHist] = ta.macd(srcC, macdFastEff, macdSlowEff, macdSignalEff)
+
+// Momentum
+momentum = ta.mom(srcC, momentumLengthEff)
+
+// Volume
+volMA = ta.sma(srcV, volumeMAEff)
+volumeStrength = srcV > volMA
+
+// Ichimoku Cloud
+donchian(len) => math.avg(ta.lowest(srcL, len), ta.highest(srcH, len))
+conversionLine = donchian(conversionEff)
+baseLine = donchian(baseEff)
+leadSpanA = math.avg(conversionLine, baseLine)
+leadSpanB = donchian(laggingEff)
+
+// ==================== DIVERGENCE DETECTION ====================
+
+// Pivot Points
+pivotHigh = ta.pivothigh(srcH, pivotLookback, pivotLookback)
+pivotLow = ta.pivotlow(srcL, pivotLookback, pivotLookback)
+
+// Store pivot values
+var float lastPivotHigh = na
+var int lastPivotHighBar = na
+var float lastPivotLow = na
+var int lastPivotLowBar = na
+
+if not na(pivotHigh)
+    lastPivotHigh := high[pivotLookback]
+    lastPivotHighBar := bar_index - pivotLookback
+
+if not na(pivotLow)
+    lastPivotLow := low[pivotLookback]
+    lastPivotLowBar := bar_index - pivotLookback
+
+// Store RSI values at pivots
+var float lastPivotHighRSI = na
+var float lastPivotLowRSI = na
+
+if not na(pivotHigh)
+    lastPivotHighRSI := rsi[pivotLookback]
+
+if not na(pivotLow)
+    lastPivotLowRSI := rsi[pivotLookback]
+
+// Bullish Divergence (Higher Low in RSI, Lower Low in Price)
+bullishDiv = false
+if not na(pivotLow) and not na(lastPivotLow) and not na(lastPivotLowRSI)
+    priceLowerLow = low[pivotLookback] < lastPivotLow
+    rsiHigherLow = rsi[pivotLookback] > lastPivotLowRSI
+    bullishDiv := priceLowerLow and rsiHigherLow
+
+// Bearish Divergence (Lower High in RSI, Higher High in Price)
+bearishDiv = false
+if not na(pivotHigh) and not na(lastPivotHigh) and not na(lastPivotHighRSI)
+    priceHigherHigh = high[pivotLookback] > lastPivotHigh
+    rsiLowerHigh = rsi[pivotLookback] < lastPivotHighRSI
+    bearishDiv := priceHigherHigh and rsiLowerHigh
+
+// ==================== TREND ANALYSIS ====================
+
+// Macro Trend (Higher timeframe concept - using slower MA)
+macroTrendBullish = ma2 > ta.ema(srcC, 100)
+
+// Current Timeframe Trend
+currentTrendBullish = srcC > ma1 and ma1 > ma2
+
+// Trend Shift Detection
+bullishTrendShift = ta.crossover(ma1, ma2)
+bearishTrendShift = ta.crossunder(ma1, ma2)
+
+// ==================== MOMENTUM ====================
+momentumBullish = momentum > 0 and momentum > momentum[1]
+
+// ==================== MARKET STRUCTURE ====================
+// Simple structure: Higher highs and higher lows = bullish
+structureBullish = high > high[5] and low > low[5]
+
+// ==================== OVERBOUGHT/OVERSOLD ====================
+overbought = rsi > rsiOBEff
+oversold = rsi < rsiOSEff
+neutral = not overbought and not oversold
+
+// ==================== VOLUME AND ORDER FLOW ====================
+volumeBullish = srcV > volMA and srcC > srcO
+
+// ==================== CONFLUENCE SCORING ====================
+bullishScore = 0
+bearishScore = 0
+
+// Score each indicator
+bullishScore += currentTrendBullish ? 1 : 0
+bullishScore += momentumBullish ? 1 : 0
+bullishScore += structureBullish ? 1 : 0
+bullishScore += volumeBullish ? 1 : 0
+bullishScore += srcC > leadSpanA and srcC > leadSpanB ? 1 : 0
+bullishScore += macdHist > 0 ? 1 : 0
+
+bearishScore += not currentTrendBullish ? 1 : 0
+bearishScore += not momentumBullish ? 1 : 0
+bearishScore += not structureBullish ? 1 : 0
+bearishScore += not volumeBullish ? 1 : 0
+bearishScore += srcC < leadSpanA and srcC < leadSpanB ? 1 : 0
+bearishScore += macdHist < 0 ? 1 : 0
+
+// ==================== SIGNAL GENERATION ====================
+
+rsiCrossOver30 = ta.crossover(rsi, 30)
+rsiCrossUnder70 = ta.crossunder(rsi, 70)
+
+var int lastBullBaseBar = na
+var int lastBearBaseBar = na
+bullBase = bullishDiv or bullishTrendShift or (oversold and rsiCrossOver30)
+bearBase = bearishDiv or bearishTrendShift or (overbought and rsiCrossUnder70)
+if bullBase
+    lastBullBaseBar := bar_index
+if bearBase
+    lastBearBaseBar := bar_index
+freshBull = not na(lastBullBaseBar) and (bar_index - lastBullBaseBar) <= signalMaxAge
+freshBear = not na(lastBearBaseBar) and (bar_index - lastBearBaseBar) <= signalMaxAge
+
+// Buy Signal: Bullish divergence + confluence + oversold
+buySignal = bullishDiv and bullishScore >= confluenceRequired
+buySignal := buySignal or (bullishTrendShift and bullishScore >= confluenceRequired)
+buySignal := buySignal or (oversold and rsiCrossOver30 and bullishScore >= confluenceRequired)
+buySignal := buySignal and freshBull
+
+// Sell Signal: Bearish divergence + confluence + overbought  
+sellSignal = bearishDiv and bearishScore >= confluenceRequired
+sellSignal := sellSignal or (bearishTrendShift and bearishScore >= confluenceRequired)
+sellSignal := sellSignal or (overbought and rsiCrossUnder70 and bearishScore >= confluenceRequired)
+sellSignal := sellSignal and freshBear
+
+// ==================== PLOTTING ====================
+
+// Ichimoku Cloud
+p1 = plot(leadSpanA, offset=displacement, color=color.new(color.green, 70), title="Lead Span A")
+p2 = plot(leadSpanB, offset=displacement, color=color.new(color.red, 70), title="Lead Span B")
+fill(p1, p2, color=leadSpanA > leadSpanB ? color.new(color.green, 90) : color.new(color.red, 90))
+
+// Moving Averages
+plot(ma1, "Fast MA", color=color.new(color.blue, 0), linewidth=2)
+plot(ma2, "Slow MA", color=color.new(color.orange, 0), linewidth=2)
+
+// Buy/Sell Signals
+plotshape(buySignal, "Buy Signal", shape.labelup, location.belowbar, color.new(color.green, 0), text="Buy", textcolor=color.white, size=size.normal)
+plotshape(sellSignal, "Sell Signal", shape.labeldown, location.abovebar, color.new(color.red, 0), text="Sell", textcolor=color.white, size=size.normal)
+
+// Divergence Labels
+if showDivergence and bullishDiv
+    label.new(bar_index - pivotLookback, srcL[pivotLookback], "Higher Div", style=label.style_label_up, color=color.new(color.green, 30), textcolor=color.white, size=size.small)
+
+if showDivergence and bearishDiv
+    label.new(bar_index - pivotLookback, srcH[pivotLookback], "Lower Div", style=label.style_label_down, color=color.new(color.red, 30), textcolor=color.white, size=size.small)
+
+// Trend Shift Labels
+if showTrendShift and bullishTrendShift
+    label.new(bar_index, srcL, "Trend Shift", style=label.style_label_up, color=color.new(color.aqua, 30), textcolor=color.white, size=size.small)
+
+if showTrendShift and bearishTrendShift
+    label.new(bar_index, srcH, "Trend Shift", style=label.style_label_down, color=color.new(color.purple, 30), textcolor=color.white, size=size.small)
+
+// ==================== INDICATOR TABLE ====================
+if showTable
+    var table indicatorTable = table.new(position.top_right, 2, showParamsInTable ? 17 : 8, border_width=1)
+    
+    // Header
+    table.cell(indicatorTable, 0, 0, "Indicator", bgcolor=color.new(color.gray, 50), text_color=color.white)
+    table.cell(indicatorTable, 1, 0, "Signal", bgcolor=color.new(color.gray, 50), text_color=color.white)
+    
+    // Macro Trend
+    macroColor = macroTrendBullish ? color.new(color.green, 70) : color.new(color.red, 70)
+    macroText = macroTrendBullish ? "Bullish ▲" : "Bearish ▼"
+    table.cell(indicatorTable, 0, 1, "Macro Trend", text_color=color.white)
+    table.cell(indicatorTable, 1, 1, macroText, bgcolor=macroColor, text_color=color.white)
+    
+    // Current Timeframe
+    currentColor = currentTrendBullish ? color.new(color.green, 70) : color.new(color.red, 70)
+    currentText = currentTrendBullish ? "Bullish ▲" : "Bearish ▼"
+    table.cell(indicatorTable, 0, 2, "Current Signal", text_color=color.white)
+    table.cell(indicatorTable, 1, 2, currentText, bgcolor=currentColor, text_color=color.white)
+    
+    // Momentum
+    momColor = momentumBullish ? color.new(color.green, 70) : color.new(color.red, 70)
+    momText = momentumBullish ? "Bullish ▲" : "Bearish ▼"
+    table.cell(indicatorTable, 0, 3, "Momentum", text_color=color.white)
+    table.cell(indicatorTable, 1, 3, momText, bgcolor=momColor, text_color=color.white)
+    
+    // Market Structure
+    structColor = structureBullish ? color.new(color.green, 70) : color.new(color.red, 70)
+    structText = structureBullish ? "Bullish ▲" : "Bearish ▼"
+    table.cell(indicatorTable, 0, 4, "Market Structure", text_color=color.white)
+    table.cell(indicatorTable, 1, 4, structText, bgcolor=structColor, text_color=color.white)
+    
+    // Overbought/Oversold
+    obosColor = oversold ? color.new(color.green, 70) : overbought ? color.new(color.red, 70) : color.new(color.gray, 70)
+    obosText = oversold ? "Oversold" : overbought ? "Overbought" : "Neutral ⊖"
+    table.cell(indicatorTable, 0, 5, "Overbought/Oversold", text_color=color.white)
+    table.cell(indicatorTable, 1, 5, obosText, bgcolor=obosColor, text_color=color.white)
+    
+    volColor = volumeBullish ? color.new(color.green, 70) : color.new(color.red, 70)
+    volText = volumeBullish ? "Bullish ▲" : "Bearish ▼"
+    table.cell(indicatorTable, 0, 6, "Volume and Order Flow", text_color=color.white)
+    table.cell(indicatorTable, 1, 6, volText, bgcolor=volColor, text_color=color.white)
+    volStrColor = volumeStrength ? color.new(color.green, 70) : color.new(color.red, 70)
+    volStrText = volumeStrength ? "Above Vol MA" : "Below Vol MA"
+    table.cell(indicatorTable, 0, 7, "Volume Strength", text_color=color.white)
+    table.cell(indicatorTable, 1, 7, volStrText, bgcolor=volStrColor, text_color=color.white)
+    if showParamsInTable
+        table.cell(indicatorTable, 0, 8, "Params", text_color=color.white)
+        table.cell(indicatorTable, 1, 8, "TF: " + tf, bgcolor=color.new(color.gray, 70), text_color=color.white)
+        table.cell(indicatorTable, 0, 9, "RSI Length", text_color=color.white)
+        table.cell(indicatorTable, 1, 9, str.tostring(rsiLenEff), bgcolor=color.new(color.gray, 85), text_color=color.white)
+        table.cell(indicatorTable, 0, 10, "MACD Fast", text_color=color.white)
+        table.cell(indicatorTable, 1, 10, str.tostring(macdFastEff), bgcolor=color.new(color.gray, 85), text_color=color.white)
+        table.cell(indicatorTable, 0, 11, "MACD Slow", text_color=color.white)
+        table.cell(indicatorTable, 1, 11, str.tostring(macdSlowEff), bgcolor=color.new(color.gray, 85), text_color=color.white)
+        table.cell(indicatorTable, 0, 12, "MACD Signal", text_color=color.white)
+        table.cell(indicatorTable, 1, 12, str.tostring(macdSignalEff), bgcolor=color.new(color.gray, 85), text_color=color.white)
+        table.cell(indicatorTable, 0, 13, "Fast MA", text_color=color.white)
+        table.cell(indicatorTable, 1, 13, str.tostring(trendMA1Eff), bgcolor=color.new(color.gray, 85), text_color=color.white)
+        table.cell(indicatorTable, 0, 14, "Slow MA", text_color=color.white)
+        table.cell(indicatorTable, 1, 14, str.tostring(trendMA2Eff), bgcolor=color.new(color.gray, 85), text_color=color.white)
+        table.cell(indicatorTable, 0, 15, "Momentum", text_color=color.white)
+        table.cell(indicatorTable, 1, 15, str.tostring(momentumLengthEff), bgcolor=color.new(color.gray, 85), text_color=color.white)
+        table.cell(indicatorTable, 0, 16, "Vol MA Len", text_color=color.white)
+        table.cell(indicatorTable, 1, 16, str.tostring(volumeMAEff), bgcolor=color.new(color.gray, 85), text_color=color.white)
+
+// ==================== ALERTS ====================
+alertcondition(buySignal, "Buy Signal", "Multi-Confluence BUY Signal Generated!")
+alertcondition(sellSignal, "Sell Signal", "Multi-Confluence SELL Signal Generated!")
+alertcondition(bullishDiv, "Bullish Divergence", "Bullish Divergence Detected!")
+alertcondition(bearishDiv, "Bearish Divergence", "Bearish Divergence Detected!")
+alertcondition(bullishTrendShift, "Bullish Trend Shift", "Bullish Trend Shift Detected!")
+alertcondition(bearishTrendShift, "Bearish Trend Shift", "Bearish Trend Shift Detected!")
