@@ -13,6 +13,7 @@ pivotLookback = input.int(5, "Pivot Lookback", group="Divergence")
 trendMA1 = input.int(20, "Fast MA", group="Trend")
 trendMA2 = input.int(50, "Slow MA", group="Trend")
 maType = input.string("EMA", "MA Type", options=["SMA", "EMA"], group="Trend")
+atrLen = input.int(14, "ATR Length", group="Trend")
 
 // Momentum Settings
 momentumLength = input.int(14, "Momentum Period", group="Momentum")
@@ -33,6 +34,14 @@ showDivergence = input.bool(true, "Show Divergence", group="Signals")
 showTrendShift = input.bool(true, "Show Trend Shifts", group="Signals")
 showTable = input.bool(true, "Show Indicator Table", group="Display")
 showParamsInTable = input.bool(false, "Show Effective Params", group="Display")
+showCloud = input.bool(false, "Show Ichimoku Cloud", group="Display")
+showExecute = input.bool(true, "Show Execute", group="Signals")
+executeMaxBars = input.int(2, "Max Bars To Execute", minval=1, group="Signals")
+requireExecTrendStrength = input.bool(true, "Execute Requires Trend Strength", group="Signals")
+execTrendStrengthMin = input.float(0.6, "Trend Strength Min (ATR-norm)", step=0.1, group="Signals")
+execMaxDistATR = input.float(0.8, "Max Distance to EMA1 (ATR)", step=0.1, group="Signals")
+requireExecCloud = input.bool(false, "Execute Requires Cloud Alignment", group="Signals")
+requireExecDoubleHist = input.bool(true, "Execute Requires 2 Hist Bars", group="Signals")
 
 // Timeframe Settings
 useCurrentRes = input.bool(true, "Use Current Chart Resolution?", group="Timeframe")
@@ -46,16 +55,22 @@ is15 = tfSec == 900
 is30 = tfSec == 1800
 is60 = tfSec == 3600
 is240 = tfSec == 14400
+lowTF = is1 or is5
 
 // Effective parameters per timeframe
-rsiLenEff = useAutoParams ? (is1 ? 9 : is5 ? 13 : is15 ? 14 : is30 ? 21 : is60 ? 14 : is240 ? 21 : rsiLength) : rsiLength
-macdFastEff = useAutoParams ? (is1 ? 6 : is5 ? 10 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : macdFast) : macdFast
-macdSlowEff = useAutoParams ? (is1 ? 17 : is5 ? 23 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : macdSlow) : macdSlow
-macdSignalEff = useAutoParams ? (is1 ? 5 : is5 ? 7 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : macdSignal) : macdSignal
-trendMA1Eff = useAutoParams ? (is1 ? 10 : is5 ? 21 : is15 ? 20 : is30 ? 20 : is60 ? 50 : is240 ? 50 : trendMA1) : trendMA1
-trendMA2Eff = useAutoParams ? (is1 ? 25 : is5 ? 55 : is15 ? 50 : is30 ? 50 : is60 ? 200 : is240 ? 200 : trendMA2) : trendMA2
-momentumLengthEff = useAutoParams ? (is1 ? 8 : is5 ? 13 : is15 ? 14 : is30 ? 20 : is60 ? 20 : is240 ? 21 : momentumLength) : momentumLength
-volumeMAEff = useAutoParams ? (is1 ? 35 : is5 ? 45 : is15 ? 50 : is30 ? 60 : is60 ? 70 : is240 ? 100 : volumeMA) : volumeMA
+rsiLenEff = useAutoParams ? (is1 ? 8 : is5 ? 12 : is15 ? 14 : is30 ? 21 : is60 ? 14 : is240 ? 21 : rsiLength) : rsiLength
+macdFastEff = useAutoParams ? (is1 ? 5 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : macdFast) : macdFast
+macdSlowEff = useAutoParams ? (is1 ? 15 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : macdSlow) : macdSlow
+macdSignalEff = useAutoParams ? (is1 ? 4 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : macdSignal) : macdSignal
+trendMA1Eff = useAutoParams ? (is1 ? 9 : is5 ? 18 : is15 ? 20 : is30 ? 20 : is60 ? 50 : is240 ? 50 : trendMA1) : trendMA1
+trendMA2Eff = useAutoParams ? (is1 ? 24 : is5 ? 50 : is15 ? 50 : is30 ? 50 : is60 ? 200 : is240 ? 200 : trendMA2) : trendMA2
+momentumLengthEff = useAutoParams ? (is1 ? 7 : is5 ? 12 : is15 ? 14 : is30 ? 20 : is60 ? 20 : is240 ? 21 : momentumLength) : momentumLength
+volumeMAEff = useAutoParams ? (is1 ? 32 : is5 ? 40 : is15 ? 50 : is30 ? 60 : is60 ? 70 : is240 ? 100 : volumeMA) : volumeMA
+confluenceEff = lowTF ? (is1 ? 4 : 4) : confluenceRequired
+signalMaxAgeEff = lowTF ? (is1 ? 2 : is5 ? 2 : 1) : signalMaxAge
+execTSMinEff = is1 ? 0.7 : is5 ? 0.6 : 0.5
+execDistATREff = is1 ? 0.6 : is5 ? 0.8 : 1.0
+executeMaxBarsEff = lowTF ? 2 : executeMaxBars
 conversionEff = conversionPeriods
 baseEff = basePeriods
 laggingEff = laggingSpan2Periods
@@ -63,8 +78,8 @@ displacementEff = displacement
 
 // Low timeframe RSI thresholds
 tfIsLow = is1 or is5
-rsiOSEff = tfIsLow ? (is1 ? 22 : 27) : 30
-rsiOBEff = tfIsLow ? (is1 ? 78 : 74) : 70
+rsiOSEff = tfIsLow ? (is1 ? 20 : 25) : 30
+rsiOBEff = tfIsLow ? (is1 ? 80 : 75) : 70
 
 // ==================== INDICATORS ====================
 
@@ -90,6 +105,8 @@ momentum = ta.mom(srcC, momentumLengthEff)
 // Volume
 volMA = ta.sma(srcV, volumeMAEff)
 volumeStrength = srcV > volMA
+atr = request.security(syminfo.tickerid, tf, ta.atr(atrLen))
+trendStrength = math.abs(ma1 - ma2) / atr
 
 // Ichimoku Cloud
 donchian(len) => math.avg(ta.lowest(srcL, len), ta.highest(srcH, len))
@@ -201,26 +218,56 @@ if bullBase
     lastBullBaseBar := bar_index
 if bearBase
     lastBearBaseBar := bar_index
-freshBull = not na(lastBullBaseBar) and (bar_index - lastBullBaseBar) <= signalMaxAge
-freshBear = not na(lastBearBaseBar) and (bar_index - lastBearBaseBar) <= signalMaxAge
+freshBull = not na(lastBullBaseBar) and (bar_index - lastBullBaseBar) <= signalMaxAgeEff
+freshBear = not na(lastBearBaseBar) and (bar_index - lastBearBaseBar) <= signalMaxAgeEff
 
 // Buy Signal: Bullish divergence + confluence + oversold
-buySignal = bullishDiv and bullishScore >= confluenceRequired
-buySignal := buySignal or (bullishTrendShift and bullishScore >= confluenceRequired)
-buySignal := buySignal or (oversold and rsiCrossOver30 and bullishScore >= confluenceRequired)
+buySignal = bullishDiv and bullishScore >= confluenceEff
+buySignal := buySignal or (bullishTrendShift and bullishScore >= confluenceEff)
+buySignal := buySignal or (oversold and rsiCrossOver30 and bullishScore >= confluenceEff)
 buySignal := buySignal and freshBull
+buySignal := buySignal and (is1 ? (currentTrendBullish and momentumBullish) : true)
+buySignal := buySignal and (lowTF ? macdHist > 0 : true)
 
 // Sell Signal: Bearish divergence + confluence + overbought  
-sellSignal = bearishDiv and bearishScore >= confluenceRequired
-sellSignal := sellSignal or (bearishTrendShift and bearishScore >= confluenceRequired)
-sellSignal := sellSignal or (overbought and rsiCrossUnder70 and bearishScore >= confluenceRequired)
+sellSignal = bearishDiv and bearishScore >= confluenceEff
+sellSignal := sellSignal or (bearishTrendShift and bearishScore >= confluenceEff)
+sellSignal := sellSignal or (overbought and rsiCrossUnder70 and bearishScore >= confluenceEff)
 sellSignal := sellSignal and freshBear
+sellSignal := sellSignal and (is1 ? (not currentTrendBullish and not momentumBullish) : true)
+sellSignal := sellSignal and (lowTF ? macdHist < 0 : true)
+
+var int lastBuySignalBar = na
+var float lastBuySignalHigh = na
+var int lastSellSignalBar = na
+var float lastSellSignalLow = na
+if buySignal
+    lastBuySignalBar := bar_index
+    lastBuySignalHigh := srcH
+if sellSignal
+    lastSellSignalBar := bar_index
+    lastSellSignalLow := srcL
+buyExecAgeOK = not na(lastBuySignalBar) and (bar_index - lastBuySignalBar) <= executeMaxBarsEff
+sellExecAgeOK = not na(lastSellSignalBar) and (bar_index - lastSellSignalBar) <= executeMaxBarsEff
+execBuyTrig = ta.crossover(srcC, lastBuySignalHigh)
+execSellTrig = ta.crossunder(srcC, lastSellSignalLow)
+distFromMa1 = math.abs(srcC - ma1)
+tsOK = not requireExecTrendStrength or trendStrength >= execTSMinEff
+distOK = distFromMa1 <= execDistATREff * atr
+cloudOKBuy = not requireExecCloud or (srcC > leadSpanA and srcC > leadSpanB)
+cloudOKSell = not requireExecCloud or (srcC < leadSpanA and srcC < leadSpanB)
+histUp2 = macdHist >= macdHist[1] and macdHist[1] >= macdHist[2]
+histDown2 = macdHist <= macdHist[1] and macdHist[1] <= macdHist[2]
+histOKBuy = not requireExecDoubleHist or histUp2
+histOKSell = not requireExecDoubleHist or histDown2
+executeBuy = showExecute and buyExecAgeOK and execBuyTrig and cloudOKBuy and histOKBuy and (lowTF ? (macdHist > 0 and currentTrendBullish and momentumBullish and tsOK and distOK) : true)
+executeSell = showExecute and sellExecAgeOK and execSellTrig and cloudOKSell and histOKSell and (lowTF ? (macdHist < 0 and not currentTrendBullish and not momentumBullish and tsOK and distOK) : true)
 
 // ==================== PLOTTING ====================
 
 // Ichimoku Cloud
-p1 = plot(leadSpanA, offset=displacement, color=color.new(color.green, 70), title="Lead Span A")
-p2 = plot(leadSpanB, offset=displacement, color=color.new(color.red, 70), title="Lead Span B")
+p1 = plot(showCloud ? leadSpanA : na, offset=displacement, color=color.new(color.green, 70), title="Lead Span A")
+p2 = plot(showCloud ? leadSpanB : na, offset=displacement, color=color.new(color.red, 70), title="Lead Span B")
 fill(p1, p2, color=leadSpanA > leadSpanB ? color.new(color.green, 90) : color.new(color.red, 90))
 
 // Moving Averages
@@ -230,6 +277,8 @@ plot(ma2, "Slow MA", color=color.new(color.orange, 0), linewidth=2)
 // Buy/Sell Signals
 plotshape(buySignal, "Buy Signal", shape.labelup, location.belowbar, color.new(color.green, 0), text="Buy", textcolor=color.white, size=size.normal)
 plotshape(sellSignal, "Sell Signal", shape.labeldown, location.abovebar, color.new(color.red, 0), text="Sell", textcolor=color.white, size=size.normal)
+plotshape(executeBuy, "Execute", shape.labelup, location.belowbar, color.new(color.blue, 0), text="Execute", textcolor=color.white, size=size.tiny)
+plotshape(executeSell, "Execute", shape.labeldown, location.abovebar, color.new(color.blue, 0), text="Execute", textcolor=color.white, size=size.tiny)
 
 // Divergence Labels
 if showDivergence and bullishDiv
@@ -247,7 +296,7 @@ if showTrendShift and bearishTrendShift
 
 // ==================== INDICATOR TABLE ====================
 if showTable
-    var table indicatorTable = table.new(position.top_right, 2, showParamsInTable ? 17 : 8, border_width=1)
+    var table indicatorTable = table.new(position.top_right, 2, showParamsInTable ? 17 : 9, border_width=1)
     
     // Header
     table.cell(indicatorTable, 0, 0, "Indicator", bgcolor=color.new(color.gray, 50), text_color=color.white)
@@ -291,6 +340,10 @@ if showTable
     volStrText = volumeStrength ? "Above Vol MA" : "Below Vol MA"
     table.cell(indicatorTable, 0, 7, "Volume Strength", text_color=color.white)
     table.cell(indicatorTable, 1, 7, volStrText, bgcolor=volStrColor, text_color=color.white)
+    tsColor = trendStrength >= execTrendStrengthMin ? color.new(color.green, 70) : color.new(color.red, 70)
+    tsText = trendStrength >= execTrendStrengthMin ? "Strong" : "Weak"
+    table.cell(indicatorTable, 0, 8, "Trend Strength", text_color=color.white)
+    table.cell(indicatorTable, 1, 8, tsText, bgcolor=tsColor, text_color=color.white)
     if showParamsInTable
         table.cell(indicatorTable, 0, 8, "Params", text_color=color.white)
         table.cell(indicatorTable, 1, 8, "TF: " + tf, bgcolor=color.new(color.gray, 70), text_color=color.white)
@@ -318,3 +371,5 @@ alertcondition(bullishDiv, "Bullish Divergence", "Bullish Divergence Detected!")
 alertcondition(bearishDiv, "Bearish Divergence", "Bearish Divergence Detected!")
 alertcondition(bullishTrendShift, "Bullish Trend Shift", "Bullish Trend Shift Detected!")
 alertcondition(bearishTrendShift, "Bearish Trend Shift", "Bearish Trend Shift Detected!")
+alertcondition(executeBuy, "Execute Buy", "Execute BUY Triggered")
+alertcondition(executeSell, "Execute Sell", "Execute SELL Triggered")
