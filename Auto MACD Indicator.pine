@@ -10,6 +10,7 @@ sd = input(true, title="Show Dots When MacD Crosses Signal Line?")
 sh = input(true, title="Show Histogram?")
 macd_colorChange = input(true,title="Change MacD Line Color-Signal Line Cross?")
 hist_colorChange = input(true,title="MacD Histogram 4 Colors?")
+useEMAForSignal = input(true, title="Use EMA for Signal Line?")
 
 res = useCurrentRes ? timeframe.period : resCustom
 tfSec = timeframe.in_seconds(res)
@@ -23,15 +24,15 @@ is240 = tfSec == 14400
 fastLength = input.int(12, minval=1)
 slowLength = input.int(26, minval=1)
 signalLength = input.int(9, minval=1)
-fastEff = useAutoParams ? (is1 ? 6 : is5 ? 10 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : fastLength) : fastLength
-slowEff = useAutoParams ? (is1 ? 17 : is5 ? 23 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : slowLength) : slowLength
-signalEff = useAutoParams ? (is1 ? 5 : is5 ? 7 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : signalLength) : signalLength
+fastEff = useAutoParams ? (is1 ? 5 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : fastLength) : fastLength
+slowEff = useAutoParams ? (is1 ? 15 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : slowLength) : slowLength
+signalEff = useAutoParams ? (is1 ? 4 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : signalLength) : signalLength
 
 fastMA = ta.ema(source, fastEff)
 slowMA = ta.ema(source, slowEff)
 
 macd = fastMA - slowMA
-signal = ta.sma(macd, signalEff)
+signal = useEMAForSignal ? ta.ema(macd, signalEff) : ta.sma(macd, signalEff)
 hist = macd - signal
 
 outMacD = request.security(syminfo.tickerid, res, macd)
