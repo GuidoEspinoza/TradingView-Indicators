@@ -36,9 +36,9 @@ macd = fastMA - slowMA
 signal = useEMAForSignal ? ta.ema(macd, signalEff) : ta.sma(macd, signalEff)
 hist = macd - signal
 
-outMacD = request.security(syminfo.tickerid, res, macd)
-outSignal = request.security(syminfo.tickerid, res, signal)
-outHist = request.security(syminfo.tickerid, res, hist)
+outMacD = request.security(syminfo.tickerid, res, macd, barmerge.gaps_off, barmerge.lookahead_off)
+outSignal = request.security(syminfo.tickerid, res, signal, barmerge.gaps_off, barmerge.lookahead_off)
+outHist = request.security(syminfo.tickerid, res, hist, barmerge.gaps_off, barmerge.lookahead_off)
 
 histA_IsUp = outHist > outHist[1] and outHist > 0
 histA_IsDown = outHist < outHist[1] and outHist > 0
@@ -58,10 +58,11 @@ circleYPosition = outSignal
 crossEvent = ta.cross(outMacD, outSignal)
 crossZeroEvent = ta.cross(outMacD, 0)
 
-plot(smd and not na(outMacD) ? outMacD : na, title="MACD", color=macd_color, linewidth=4)
-plot(smd and not na(outSignal) ? outSignal : na, title="Signal Line", color=signal_color, style=plot.style_line ,linewidth=2)
-plot(sh and not na(outHist) ? outHist : na, title="Histogram", color=plot_color, style=plot.style_histogram, linewidth=4)
-plot(sd and not na(outMacD) and not na(outSignal) and crossEvent ? circleYPosition : na, title="Cross", style=plot.style_circles, linewidth=4, color=macd_color)
+validData = not na(outMacD) and not na(outSignal) and not na(outHist)
+plot(smd and validData ? outMacD : na, title="MACD", color=macd_color, linewidth=4)
+plot(smd and validData ? outSignal : na, title="Signal Line", color=signal_color, style=plot.style_line ,linewidth=2)
+plot(sh and validData ? outHist : na, title="Histogram", color=plot_color, style=plot.style_histogram, linewidth=4)
+plot(sd and validData and crossEvent ? circleYPosition : na, title="Cross", style=plot.style_circles, linewidth=4, color=macd_color)
 hline(0, '0 Line', linestyle=hline.style_solid, linewidth=2, color=color.white)
 alertcondition(crossEvent, "MACD Cross", "MACD crossed Signal Line")
 alertcondition(crossZeroEvent, "MACD Zero Cross", "MACD crossed 0")

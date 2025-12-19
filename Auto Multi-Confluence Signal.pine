@@ -28,8 +28,8 @@ laggingSpan2Periods = input.int(52, "Leading Span B", group="Ichimoku")
 displacement = input.int(26, "Displacement", group="Ichimoku")
 
 // Signal Settings
-confluenceRequired = input.int(5, "Min Confluence (out of 6)", minval=1, maxval=6, group="Signals")
-signalMaxAge = input.int(2, "Max Bars Since Base", minval=1, group="Signals")
+confluenceRequired = input.int(3, "Min Confluence (out of 6)", minval=1, maxval=6, group="Signals")
+signalMaxAge = input.int(3, "Max Bars Since Base", minval=1, group="Signals")
 showDivergence = input.bool(true, "Show Divergence", group="Signals")
 showTrendShift = input.bool(true, "Show Trend Shifts", group="Signals")
 showTable = input.bool(true, "Show Indicator Table", group="Display")
@@ -67,8 +67,8 @@ trendMA1Eff = useAutoParams ? (is1 ? 9 : is3 ? 12 : is5 ? 18 : is15 ? 20 : is30 
 trendMA2Eff = useAutoParams ? (is1 ? 24 : is3 ? 30 : is5 ? 50 : is15 ? 50 : is30 ? 50 : is60 ? 200 : is240 ? 200 : trendMA2) : trendMA2
 momentumLengthEff = useAutoParams ? (is1 ? 7 : is3 ? 9 : is5 ? 12 : is15 ? 14 : is30 ? 20 : is60 ? 20 : is240 ? 21 : momentumLength) : momentumLength
 volumeMAEff = useAutoParams ? (is1 ? 32 : is3 ? 35 : is5 ? 40 : is15 ? 50 : is30 ? 60 : is60 ? 70 : is240 ? 100 : volumeMA) : volumeMA
-confluenceEff = lowTF ? (is1 ? 3 : is3 ? 4 : is5 ? 4 : 4) : confluenceRequired
-signalMaxAgeEff = lowTF ? (is1 ? 2 : is3 ? 2 : is5 ? 2 : 1) : signalMaxAge
+confluenceEff = lowTF ? (is1 ? 2 : is3 ? 3 : is5 ? 3 : 3) : confluenceRequired
+signalMaxAgeEff = lowTF ? (is1 ? 3 : is3 ? 3 : is5 ? 3 : 2) : signalMaxAge
 execTSMinEff = is1 ? 0.7 : is3 ? 0.65 : is5 ? 0.6 : 0.5
 execDistATREff = is1 ? 0.6 : is3 ? 0.7 : is5 ? 0.8 : 1.0
 executeMaxBarsEff = lowTF ? 2 : executeMaxBars
@@ -85,12 +85,13 @@ rsiOBEff = tfIsLow ? (is1 ? 80 : is3 ? 78 : 75) : 70
 // ==================== INDICATORS ====================
 
 // Moving Averages
-srcO = request.security(syminfo.tickerid, tf, open)
-srcH = request.security(syminfo.tickerid, tf, high)
-srcL = request.security(syminfo.tickerid, tf, low)
-srcC = request.security(syminfo.tickerid, tf, close)
-srcV = request.security(syminfo.tickerid, tf, volume)
-
+// ==================== CORRECCIÓN ANTI-REPAINTING ====================
+srcO = request.security(syminfo.tickerid, tf, open, barmerge.gaps_off, barmerge.lookahead_off)
+srcH = request.security(syminfo.tickerid, tf, high, barmerge.gaps_off, barmerge.lookahead_off)
+srcL = request.security(syminfo.tickerid, tf, low, barmerge.gaps_off, barmerge.lookahead_off)
+srcC = request.security(syminfo.tickerid, tf, close, barmerge.gaps_off, barmerge.lookahead_off)
+srcV = request.security(syminfo.tickerid, tf, volume, barmerge.gaps_off, barmerge.lookahead_off)
+atrValue = request.security(syminfo.tickerid, tf, ta.atr(atrLen), barmerge.gaps_off, barmerge.lookahead_off)
 ma1 = maType == "EMA" ? ta.ema(srcC, trendMA1Eff) : ta.sma(srcC, trendMA1Eff)
 ma2 = maType == "EMA" ? ta.ema(srcC, trendMA2Eff) : ta.sma(srcC, trendMA2Eff)
 
@@ -106,8 +107,7 @@ momentum = ta.mom(srcC, momentumLengthEff)
 // Volume
 volMA = ta.sma(srcV, volumeMAEff)
 volumeStrength = srcV > volMA
-atr = request.security(syminfo.tickerid, tf, ta.atr(atrLen))
-trendStrength = math.abs(ma1 - ma2) / atr
+trendStrength = math.abs(ma1 - ma2) / atrValue
 
 // Ichimoku Cloud
 donchian(len) => math.avg(ta.lowest(srcL, len), ta.highest(srcH, len))
@@ -163,7 +163,8 @@ if not na(pivotHigh) and not na(lastPivotHigh) and not na(lastPivotHighRSI)
 // ==================== TREND ANALYSIS ====================
 
 // Macro Trend (Higher timeframe concept - using slower MA)
-macroTrendBullish = ma2 > ta.ema(srcC, 100)
+// Simplified: Use ma2 position relative to its own average for macro trend
+macroTrendBullish = ma2 > ta.ema(ma2, 100)
 
 // Current Timeframe Trend
 currentTrendBullish = srcC > ma1 and ma1 > ma2
@@ -223,20 +224,25 @@ freshBull = not na(lastBullBaseBar) and (bar_index - lastBullBaseBar) <= signalM
 freshBear = not na(lastBearBaseBar) and (bar_index - lastBearBaseBar) <= signalMaxAgeEff
 
 // Buy Signal: Bullish divergence + confluence + oversold
+strongBull = bullishTrendShift and macdHist > 0 and momentumBullish
+strongBear = bearishTrendShift and macdHist < 0 and not momentumBullish
+
 buySignal = bullishDiv and bullishScore >= confluenceEff
 buySignal := buySignal or (bullishTrendShift and bullishScore >= confluenceEff)
+buySignal := buySignal or (strongBull and bullishScore >= (confluenceEff - 1))
 buySignal := buySignal or (oversold and rsiCrossOver30 and bullishScore >= confluenceEff)
 buySignal := buySignal and freshBull
-buySignal := buySignal and (is1 ? (currentTrendBullish and momentumBullish) : true)
-buySignal := buySignal and (lowTF ? macdHist > 0 : true)
+buySignal := buySignal and (is1 and not strongBull ? (currentTrendBullish and momentumBullish) : true)
+buySignal := buySignal and (lowTF and not strongBull ? macdHist > 0 : true)
 
 // Sell Signal: Bearish divergence + confluence + overbought  
 sellSignal = bearishDiv and bearishScore >= confluenceEff
 sellSignal := sellSignal or (bearishTrendShift and bearishScore >= confluenceEff)
+sellSignal := sellSignal or (strongBear and bearishScore >= (confluenceEff - 1))
 sellSignal := sellSignal or (overbought and rsiCrossUnder70 and bearishScore >= confluenceEff)
 sellSignal := sellSignal and freshBear
-sellSignal := sellSignal and (is1 ? (not currentTrendBullish and not momentumBullish) : true)
-sellSignal := sellSignal and (lowTF ? macdHist < 0 : true)
+sellSignal := sellSignal and (is1 and not strongBear ? (not currentTrendBullish and not momentumBullish) : true)
+sellSignal := sellSignal and (lowTF and not strongBear ? macdHist < 0 : true)
 
 var int lastBuySignalBar = na
 var float lastBuySignalHigh = na
@@ -254,7 +260,7 @@ execBuyTrig = ta.crossover(srcC, lastBuySignalHigh)
 execSellTrig = ta.crossunder(srcC, lastSellSignalLow)
 distFromMa1 = math.abs(srcC - ma1)
 tsOK = not requireExecTrendStrength or trendStrength >= execTSMinEff
-distOK = distFromMa1 <= execDistATREff * atr
+distOK = distFromMa1 <= execDistATREff * atrValue
 cloudOKBuy = not requireExecCloud or (srcC > leadSpanA and srcC > leadSpanB)
 cloudOKSell = not requireExecCloud or (srcC < leadSpanA and srcC < leadSpanB)
 histUp2 = macdHist >= macdHist[1] and macdHist[1] >= macdHist[2]
