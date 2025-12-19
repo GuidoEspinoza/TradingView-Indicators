@@ -50,26 +50,27 @@ useAutoParams = input.bool(true, "Auto-Adjust Parameters by Timeframe", group="T
 tf = useCurrentRes ? timeframe.period : resCustom
 tfSec = timeframe.in_seconds(tf)
 is1 = tfSec == 60
+is3 = tfSec == 180  // 3 minutes support added
 is5 = tfSec == 300
 is15 = tfSec == 900
 is30 = tfSec == 1800
 is60 = tfSec == 3600
 is240 = tfSec == 14400
-lowTF = is1 or is5
+lowTF = is1 or is3 or is5
 
 // Effective parameters per timeframe
-rsiLenEff = useAutoParams ? (is1 ? 8 : is5 ? 12 : is15 ? 14 : is30 ? 21 : is60 ? 14 : is240 ? 21 : rsiLength) : rsiLength
-macdFastEff = useAutoParams ? (is1 ? 5 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : macdFast) : macdFast
-macdSlowEff = useAutoParams ? (is1 ? 15 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : macdSlow) : macdSlow
-macdSignalEff = useAutoParams ? (is1 ? 4 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : macdSignal) : macdSignal
-trendMA1Eff = useAutoParams ? (is1 ? 9 : is5 ? 18 : is15 ? 20 : is30 ? 20 : is60 ? 50 : is240 ? 50 : trendMA1) : trendMA1
-trendMA2Eff = useAutoParams ? (is1 ? 24 : is5 ? 50 : is15 ? 50 : is30 ? 50 : is60 ? 200 : is240 ? 200 : trendMA2) : trendMA2
-momentumLengthEff = useAutoParams ? (is1 ? 7 : is5 ? 12 : is15 ? 14 : is30 ? 20 : is60 ? 20 : is240 ? 21 : momentumLength) : momentumLength
-volumeMAEff = useAutoParams ? (is1 ? 32 : is5 ? 40 : is15 ? 50 : is30 ? 60 : is60 ? 70 : is240 ? 100 : volumeMA) : volumeMA
-confluenceEff = lowTF ? (is1 ? 4 : 4) : confluenceRequired
-signalMaxAgeEff = lowTF ? (is1 ? 2 : is5 ? 2 : 1) : signalMaxAge
-execTSMinEff = is1 ? 0.7 : is5 ? 0.6 : 0.5
-execDistATREff = is1 ? 0.6 : is5 ? 0.8 : 1.0
+rsiLenEff = useAutoParams ? (is1 ? 8 : is3 ? 10 : is5 ? 12 : is15 ? 14 : is30 ? 21 : is60 ? 14 : is240 ? 21 : rsiLength) : rsiLength
+macdFastEff = useAutoParams ? (is1 ? 5 : is3 ? 7 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : macdFast) : macdFast
+macdSlowEff = useAutoParams ? (is1 ? 15 : is3 ? 17 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : macdSlow) : macdSlow
+macdSignalEff = useAutoParams ? (is1 ? 4 : is3 ? 5 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : macdSignal) : macdSignal
+trendMA1Eff = useAutoParams ? (is1 ? 9 : is3 ? 12 : is5 ? 18 : is15 ? 20 : is30 ? 20 : is60 ? 50 : is240 ? 50 : trendMA1) : trendMA1
+trendMA2Eff = useAutoParams ? (is1 ? 24 : is3 ? 30 : is5 ? 50 : is15 ? 50 : is30 ? 50 : is60 ? 200 : is240 ? 200 : trendMA2) : trendMA2
+momentumLengthEff = useAutoParams ? (is1 ? 7 : is3 ? 9 : is5 ? 12 : is15 ? 14 : is30 ? 20 : is60 ? 20 : is240 ? 21 : momentumLength) : momentumLength
+volumeMAEff = useAutoParams ? (is1 ? 32 : is3 ? 35 : is5 ? 40 : is15 ? 50 : is30 ? 60 : is60 ? 70 : is240 ? 100 : volumeMA) : volumeMA
+confluenceEff = lowTF ? (is1 ? 3 : is3 ? 4 : is5 ? 4 : 4) : confluenceRequired
+signalMaxAgeEff = lowTF ? (is1 ? 2 : is3 ? 2 : is5 ? 2 : 1) : signalMaxAge
+execTSMinEff = is1 ? 0.7 : is3 ? 0.65 : is5 ? 0.6 : 0.5
+execDistATREff = is1 ? 0.6 : is3 ? 0.7 : is5 ? 0.8 : 1.0
 executeMaxBarsEff = lowTF ? 2 : executeMaxBars
 conversionEff = conversionPeriods
 baseEff = basePeriods
@@ -77,9 +78,9 @@ laggingEff = laggingSpan2Periods
 displacementEff = displacement
 
 // Low timeframe RSI thresholds
-tfIsLow = is1 or is5
-rsiOSEff = tfIsLow ? (is1 ? 20 : 25) : 30
-rsiOBEff = tfIsLow ? (is1 ? 80 : 75) : 70
+tfIsLow = is1 or is3 or is5
+rsiOSEff = tfIsLow ? (is1 ? 20 : is3 ? 22 : 25) : 30
+rsiOBEff = tfIsLow ? (is1 ? 80 : is3 ? 78 : 75) : 70
 
 // ==================== INDICATORS ====================
 

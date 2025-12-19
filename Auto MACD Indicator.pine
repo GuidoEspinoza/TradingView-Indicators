@@ -15,6 +15,7 @@ useEMAForSignal = input(true, title="Use EMA for Signal Line?")
 res = useCurrentRes ? timeframe.period : resCustom
 tfSec = timeframe.in_seconds(res)
 is1 = tfSec == 60
+is3 = tfSec == 180  // 3 minutes support added
 is5 = tfSec == 300
 is15 = tfSec == 900
 is30 = tfSec == 1800
@@ -24,9 +25,9 @@ is240 = tfSec == 14400
 fastLength = input.int(12, minval=1)
 slowLength = input.int(26, minval=1)
 signalLength = input.int(9, minval=1)
-fastEff = useAutoParams ? (is1 ? 5 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : fastLength) : fastLength
-slowEff = useAutoParams ? (is1 ? 15 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : slowLength) : slowLength
-signalEff = useAutoParams ? (is1 ? 4 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : signalLength) : signalLength
+fastEff = useAutoParams ? (is1 ? 5 : is3 ? 6 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : fastLength) : fastLength
+slowEff = useAutoParams ? (is1 ? 15 : is3 ? 18 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : slowLength) : slowLength
+signalEff = useAutoParams ? (is1 ? 4 : is3 ? 5 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : signalLength) : signalLength
 
 fastMA = ta.ema(source, fastEff)
 slowMA = ta.ema(source, slowEff)
