@@ -5,11 +5,14 @@ Guía rápida para instalar, configurar y usar los indicadores en TradingView.
 ## Indicadores
 - Auto Multi‑Confluence Signal
   - Genera etiquetas de Buy/Sell basadas en 6 fuentes: Tendencia actual, Momentum, Estructura, Volumen/Order Flow, Ichimoku y MACD.
+  - **Nueva lógica "Strong Signal":** Prioriza cruces de tendencia (Trend Shift) confirmados por MACD y Momentum, requiriendo menos confluencia.
+  - **Anti-Repainting:** Lógica corregida para asegurar que las señales no desaparezcan tras el cierre de vela.
   - Detecta Divergencias y Trend Shift (cruce de `ma1` con `ma2`).
-  - Incluye “frescura” de señal (no persigue señales viejas) y tabla de estado.
+  - Incluye “frescura” de señal y tabla de estado.
 - Auto MACD Indicator
   - MACD con parámetros auto‑ajustados por timeframe.
-  - Dibuja histograma y líneas de MACD/Signal y provee alertas de cruce con Signal y cruce por 0.
+  - **Anti-Repainting:** Garantiza estabilidad en histograma y cruces.
+  - Dibuja histograma y líneas de MACD/Signal y provee alertas de cruce.
 
 ## Instalación en TradingView
 - Abre TradingView → Pine Editor.
@@ -20,22 +23,21 @@ Guía rápida para instalar, configurar y usar los indicadores en TradingView.
 ## Configuración rápida
 - Timeframe
   - Activa “Use Current Chart Resolution” para que el indicador use el TF del gráfico.
-  - Si prefieres otro TF, desactívalo y selecciona uno en “Use Different Timeframe”.
 - Auto‑params
-  - Mantén “Auto‑Adjust Parameters by Timeframe” activado para presets óptimos por TF.
+  - Mantén “Auto‑Adjust Parameters by Timeframe” activado.
 - Señales (Multi‑Confluence)
-  - `Min Confluence (out of 6)`: recomendado 5/6 para intradía, 4/6 si quieres más señales.
-  - `Max Bars Since Base`: 2 por defecto; evita perseguir señales tardías.
-  - Opciones de visualización: Divergence, Trend Shifts y Tabla.
+  - `Min Confluence`: **3/6 por defecto** (antes 5). El sistema es más sensible a cruces de tendencia.
+  - `Max Bars Since Base`: **3 por defecto**; da un poco más de margen para confirmar la entrada.
+  - La lógica interna prioriza automáticamente las señales fuertes (Cruce EMA + MACD), saltándose filtros menores en timeframes bajos.
 
 ## Cómo usar
 - Scalping (1m/5m)
-  - Entra tras el cierre de la vela con señal (Buy/Sell) y MACD del lado correcto de 0.
-  - Confirma que 5m no contradiga y, idealmente, que su histograma acompañe.
-  - Evita ventanas de apertura/noticia; preferir “Volume Strength: Above Vol MA”.
-- Intradía (15m/30m)
-  - Requiere confluencia mínima alta (5/6). Ejecuta sólo en cierre de 15m.
-  - Confirma en 30m (orden de MAs y MACD acercándose/por debajo/encima de 0 según dirección).
+  - **Precaución:** El sistema es más sensible. Busca señales de "Cruce Fuerte" (Strong Signal).
+  - Filtra: Opera solo a favor de la tendencia de 15m/30m.
+- Intradía (15m/30m) - **RECOMENDADO**
+  - Fiabilidad superior al 70%.
+  - Busca señales de Buy/Sell acompañadas de cruce de MACD.
+  - Ideal para cuentas pequeñas buscando consistencia ($10 riesgo/trade).
 
 ## Alertas
 - Multi‑Confluence

@@ -1,53 +1,53 @@
 # Guía operativa: Auto Multi‑Confluence + Auto MACD
 
 ## Objetivo
-- Definir cuándo operar con alta probabilidad, evitando rangos, aperturas y falsas rupturas.
+- Definir cuándo operar con alta probabilidad, aprovechando la nueva sensibilidad del indicador a los cruces de tendencia.
 
 ## Principios
-- Usa el timeframe de entrada para el timing y el superior para el sesgo.
-- Ejecuta sólo en cierre de vela del TF de entrada.
-- Exige confluencia suficiente y fuerza de movimiento antes de entrar.
+- **Señal Fuerte (Prioritaria):** Cruce de MAs + MACD Histograma a favor + Momentum. Esta señal requiere menos confluencia (3/6).
+- **Señal Estándar:** Requiere más confirmación de otros factores (RSI, Ichimoku, Volumen).
+- Ejecuta sólo en cierre de vela.
+- Usa 15m/30m para mayor fiabilidad.
 
 ## Protocolo general de entrada
-- Detecta señal en el TF de entrada (Buy/Sell) y espera el cierre.
+- Detecta señal en el TF de entrada (Buy/Sell).
+  - Si es por **Cruce Fuerte** (Trend Shift + MACD), la señal es agresiva.
+  - Si es por **Divergencia/RSI**, busca confirmación extra de volumen.
 - Confirma en el TF superior:
-  - MACD del lado correcto del 0 y/o cruce por 0 cercano.
-  - Orden de medias (`ma1` por encima/debajo de `ma2`) coherente con la señal.
-- Verifica filtros del indicador:
-  - Frescura de señal activa (no perseguir señales viejas).
-  - Fuerza mínima de pendiente vs ATR (evita rangos/choppy).
-- Comprueba volumen:
-  - "Volume and Order Flow" alineado y "Volume Strength" sobre su media.
+  - MACD del lado correcto del 0.
+  - Orden de medias coherente.
+- Ejecución:
+  - Usa órdenes STOP (Buy Stop/Sell Stop) 1-2 pips por encima/debajo de la vela señal.
 
 ## Escenarios clave
 - Aperturas/Noticias
-  - Evita operar los primeros 10–15 minutos (indices USA) o 3–5 minutos en 1m.
-  - Requiere confirmación adicional del TF superior y volumen real, no sólo mechas.
+  - Evita operar los primeros 15 minutos. El indicador ahora es más sensible y puede dar falsos cruces por volatilidad inicial.
 - Cruce de EMA (Trend Shift)
-  - Trata el cruce `ma1`/`ma2` como base de señal, no como confirmación suficiente.
-  - Entra sólo si MACD e histograma acompañan y hay confluencia mínima.
-- Cruce de MACD por 0
-  - Usa el cruce por 0 para confirmar régimen; completa posición o añade tamaño.
+  - Ahora el indicador prioriza esto. Si ves etiqueta "Buy" justo en el cruce de medias con MACD verde, es una entrada de alta probabilidad.
 - Rangos/Choppy
-  - Eleva el umbral de fuerza (pendiente vs ATR) o espera 1–2 velas de confirmación.
-  - No operes si el precio oscila alrededor de `ma2` sin pendiente.
+  - El sistema bajó su exigencia de confluencia (de 5 a 3). **Peligro:** En rangos generará más señales falsas.
+  - **Filtro:** Si las medias están planas, IGNORA las señales aunque el indicador las marque.
 
 ## Reglas por timeframe
-- 1m/5m (scalping)
-  - Señal en cierre + MACD del lado del 0 + histograma 2 barras a favor.
-  - Confirmación en 5m; 15m no debe estar claramente en contra.
-  - Ventana de silencio en apertura; evita mechas largas anómalas.
-  - Entrada parcial: 50% al cierre, añade si la siguiente vela confirma.
-- 15m/30m (intradía)
-  - Confluencia mínima alta (5/6) y cierre de vela de disparo.
-  - 30m confirma sesgo (MAs y MACD hacia o bajo/encima del 0).
-  - Espera 1–2 velas de confirmación en contextos de rango o tras noticias.
+- 1m/5m (scalping agresivo)
+  - **Alta sensibilidad:** El indicador marcará muchos cruces.
+  - **Filtro obligatorio:** Solo toma señales en la dirección de la tendencia de 30m.
+  - Si 30m es alcista, ignora todas las etiquetas "Sell" en 1m/5m.
+- 15m/30m (intradía - Recomendado)
+  - **Zona de Confort:** Aquí la reducción de confluencia brilla.
+  - Señales más limpias y recorridos de 30-50 pips.
+  - Ideal para cuentas de balance bajo/medio ($500).
 
-## Gestión del riesgo
-- Stop por estructura (último swing) o por encima/debajo de `ma2` del TF de entrada.
-- Alternativa objetiva: `ATR` 1.5–2× del TF de entrada.
-- Parciales en 0.8–1.0R o cuando el histograma pierde altura 2–3 barras.
-- Riesgo total por idea: 0.5–1% en scalping; 1–2% en intradía.
+## Gestión del riesgo (Plan $500 USD)
+- **Riesgo por trade:** Fijo al 2% ($10 USD). No exceder.
+- **Apalancamiento:** 1:200 (Solo para margen, no para sobreoperar).
+- **Stop Loss:**
+  - Mínimo técnico: 15 Pips (en 1m/5m) y 25 Pips (en 15m/30m).
+  - Nunca menos de eso, el ruido te sacará.
+  - Ubicación: Debajo del último swing low o ATR x 1.5.
+- **Take Profit:**
+  - Ratio 1:1.5 mínimo (Arriesga $10 para ganar $15).
+  - Meta diaria: $25 USD (5%). Con 2 operaciones positivas estás hecho.
 
 ## Checklist antes de operar
 - Señal en cierre del TF de entrada y MACD del lado del 0.
