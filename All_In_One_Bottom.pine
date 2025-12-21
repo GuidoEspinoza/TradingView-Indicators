@@ -1,0 +1,70 @@
+//@version=6
+indicator("Professional Bottom Combo (MACD + RVOL)", shorttitle="Pro MACD+RVOL")
+
+// ==========================================
+// 1. PROFESSIONAL RVOL (FONDO)
+// ==========================================
+group_rvol = "=== RVOL Settings ==="
+rvolLen = input.int(20, "RVOL Lookback Days", minval=1, group=group_rvol)
+rvolMaLen = input.int(20, "RVOL MA Length", minval=1, group=group_rvol)
+thUltra = input.float(2.5, "Ultra High Threshold", step=0.1, group=group_rvol)
+thHigh = input.float(1.2, "High Threshold", step=0.1, group=group_rvol)
+thLow = input.float(0.5, "Low Threshold", step=0.1, group=group_rvol)
+
+// RVOL Calc
+volSMA = ta.sma(volume, rvolMaLen)
+rvol = volume / volSMA
+
+// RVOL Colors
+rvolColor = rvol >= thUltra ? color.new(color.yellow, 50) : rvol >= thHigh ? color.new(color.green, 50) : rvol <= thLow ? color.new(color.purple, 50) : color.new(color.gray, 80)
+
+// Plot RVOL (Scaled to not interfere with MACD, or separate scale)
+// Using plot.style_columns on the left scale
+plot(rvol, "RVOL", color=rvolColor, style=plot.style_columns, linewidth=1, force_overlay=false)
+hline(1.0, "Avg Vol", color=color.gray, linestyle=hline.style_dotted)
+
+// ==========================================
+// 2. AUTO MACD (FRENTE)
+// ==========================================
+group_macd = "=== MACD Settings ==="
+useAuto = input.bool(true, "Auto-Adjust Params", group=group_macd)
+fastLen = input.int(12, "Fast Length", group=group_macd)
+slowLen = input.int(26, "Slow Length", group=group_macd)
+sigLen = input.int(9, "Signal Length", group=group_macd)
+
+// Auto Logic
+tfSec = timeframe.in_seconds(timeframe.period)
+is1 = tfSec == 60
+is3 = tfSec == 180
+is5 = tfSec == 300
+is15 = tfSec == 900
+is30 = tfSec == 1800
+is60 = tfSec == 3600
+is240 = tfSec == 14400
+
+fastEff = useAuto ? (is1 ? 6 : is3 ? 7 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : fastLen) : fastLen
+slowEff = useAuto ? (is1 ? 13 : is3 ? 17 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : slowLen) : slowLen
+sigEff = useAuto ? (is1 ? 4 : is3 ? 5 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : sigLen) : sigLen
+
+// MACD Calc (Anti-Repainting not needed for current TF, but good practice if calling security. Here we use current TF)
+[macdLine, signalLine, macdHist] = ta.macd(close, fastEff, slowEff, sigEff)
+
+// MACD Colors
+colMacd = macdLine >= signalLine ? color.lime : color.red
+colSig = macdLine >= signalLine ? color.yellow : color.orange
+colHist = macdHist >= 0 ? (macdHist > macdHist[1] ? color.new(color.aqua, 40) : color.new(color.blue, 40)) : (macdHist < macdHist[1] ? color.new(color.red, 40) : color.new(color.maroon, 40))
+
+// Plot MACD (Using a separate scale/axis logic visually)
+// To make them coexist nicely, we plot MACD normally. RVOL columns will be at the bottom.
+// We can scale RVOL down visually or just let them overlap.
+// Better: MACD is the "Main" visual here.
+
+plot(macdHist, "Histogram", color=colHist, style=plot.style_histogram, linewidth=3)
+plot(macdLine, "MACD", color=colMacd, linewidth=2)
+plot(signalLine, "Signal", color=colSig, linewidth=1)
+
+hline(0, "Zero Line", color=color.white)
+
+// ==================== ALERTS ====================
+alertcondition(ta.cross(macdLine, signalLine), "MACD Cross", "MACD Crossing Signal")
+alertcondition(rvol > thUltra, "Ultra Volume", "RVOL Spiking > 2.5x")

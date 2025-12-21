@@ -1,0 +1,309 @@
+//@version=6
+indicator("Professional All-In-One Overlay", shorttitle="Pro Suite", overlay=true, max_boxes_count=500, max_labels_count=500, max_lines_count=500)
+
+// ==========================================
+// 1. AUTO MULTI-CONFLUENCE SIGNAL
+// ==========================================
+group_conf = "=== Multi-Confluence Signals ==="
+// Divergence
+rsiLength = input.int(14, "RSI Length", group=group_conf)
+macdFast = input.int(12, "MACD Fast", group=group_conf)
+macdSlow = input.int(26, "MACD Slow", group=group_conf)
+macdSignal = input.int(9, "MACD Signal", group=group_conf)
+pivotLookback = input.int(5, "Pivot Lookback", group=group_conf)
+
+// Trend Settings
+trendMA1 = input.int(20, "Fast MA", group=group_conf)
+trendMA2 = input.int(100, "Slow MA (Trend)", group=group_conf) // Ajustado a 100 por defecto para intradía
+maType = input.string("EMA", "MA Type", options=["SMA", "EMA"], group=group_conf)
+atrLen = input.int(14, "ATR Length", group=group_conf)
+
+// Momentum & Volume
+momentumLength = input.int(14, "Momentum Period", group=group_conf)
+volumeMA = input.int(20, "Volume MA Length", group=group_conf)
+
+// Ichimoku
+conversionPeriods = input.int(9, "Conversion Line", group=group_conf)
+basePeriods = input.int(26, "Base Line", group=group_conf)
+laggingSpan2Periods = input.int(52, "Leading Span B", group=group_conf)
+displacement = input.int(26, "Displacement", group=group_conf)
+
+// Signal Logic
+confluenceRequired = input.int(3, "Min Confluence", minval=1, maxval=6, group=group_conf)
+signalMaxAge = input.int(3, "Max Bars Since Base", minval=1, group=group_conf)
+showDivergence = input.bool(true, "Show Divergence", group=group_conf)
+showTrendShift = input.bool(true, "Show Trend Shifts", group=group_conf)
+showTable = input.bool(true, "Show Info Table", group=group_conf)
+
+// Timeframe Logic
+useCurrentRes = input.bool(true, "Use Current Chart Resolution?", group=group_conf)
+resCustom = input.string("60", "Use Different Timeframe", options=["1","5","15","30","60","240"], group=group_conf)
+useAutoParams = input.bool(true, "Auto-Adjust Params", group=group_conf)
+
+tf = useCurrentRes ? timeframe.period : resCustom
+tfSec = timeframe.in_seconds(tf)
+is1 = tfSec == 60
+is3 = tfSec == 180
+is5 = tfSec == 300
+is15 = tfSec == 900
+is30 = tfSec == 1800
+is60 = tfSec == 3600
+is240 = tfSec == 14400
+lowTF = is1 or is3 or is5
+
+// Effective Params
+rsiLenEff = useAutoParams ? (is1 ? 8 : is3 ? 10 : is5 ? 12 : is15 ? 14 : is30 ? 14 : is60 ? 14 : is240 ? 14 : rsiLength) : rsiLength
+macdFastEff = useAutoParams ? (is1 ? 6 : is3 ? 7 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : macdFast) : macdFast
+macdSlowEff = useAutoParams ? (is1 ? 13 : is3 ? 17 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : macdSlow) : macdSlow
+macdSignalEff = useAutoParams ? (is1 ? 4 : is3 ? 5 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : macdSignal) : macdSignal
+trendMA1Eff = useAutoParams ? (is1 ? 9 : is3 ? 12 : is5 ? 18 : is15 ? 20 : is30 ? 20 : is60 ? 50 : is240 ? 50 : trendMA1) : trendMA1
+trendMA2Eff = useAutoParams ? (is1 ? 24 : is3 ? 30 : is5 ? 50 : is15 ? 100 : is30 ? 100 : is60 ? 200 : is240 ? 200 : trendMA2) : trendMA2
+momentumLengthEff = useAutoParams ? (is1 ? 7 : is3 ? 9 : is5 ? 12 : is15 ? 14 : is30 ? 20 : is60 ? 20 : is240 ? 21 : momentumLength) : momentumLength
+volumeMAEff = useAutoParams ? (is1 ? 32 : is3 ? 35 : is5 ? 40 : is15 ? 50 : is30 ? 60 : is60 ? 70 : is240 ? 100 : volumeMA) : volumeMA
+confluenceEff = lowTF ? (is1 ? 2 : is3 ? 3 : is5 ? 3 : 3) : confluenceRequired
+signalMaxAgeEff = lowTF ? (is1 ? 3 : is3 ? 3 : is5 ? 3 : 2) : signalMaxAge
+
+// Data Fetching (Anti-Repainting)
+srcO = request.security(syminfo.tickerid, tf, open, barmerge.gaps_off, barmerge.lookahead_off)
+srcH = request.security(syminfo.tickerid, tf, high, barmerge.gaps_off, barmerge.lookahead_off)
+srcL = request.security(syminfo.tickerid, tf, low, barmerge.gaps_off, barmerge.lookahead_off)
+srcC = request.security(syminfo.tickerid, tf, close, barmerge.gaps_off, barmerge.lookahead_off)
+srcV = request.security(syminfo.tickerid, tf, volume, barmerge.gaps_off, barmerge.lookahead_off)
+atrValue = request.security(syminfo.tickerid, tf, ta.atr(atrLen), barmerge.gaps_off, barmerge.lookahead_off)
+ma1 = maType == "EMA" ? ta.ema(srcC, trendMA1Eff) : ta.sma(srcC, trendMA1Eff)
+ma2 = maType == "EMA" ? ta.ema(srcC, trendMA2Eff) : ta.sma(srcC, trendMA2Eff)
+
+// Indicators Calc
+rsi = ta.rsi(srcC, rsiLenEff)
+[macdLine, signalLine, macdHist] = ta.macd(srcC, macdFastEff, macdSlowEff, macdSignalEff)
+momentum = ta.mom(srcC, momentumLengthEff)
+volMA = ta.sma(srcV, volumeMAEff)
+volumeStrength = srcV > volMA
+trendStrength = math.abs(ma1 - ma2) / atrValue
+
+// Ichimoku
+donchian(len) => math.avg(ta.lowest(srcL, len), ta.highest(srcH, len))
+conversionLine = donchian(conversionPeriods)
+baseLine = donchian(basePeriods)
+leadSpanA = math.avg(conversionLine, baseLine)
+leadSpanB = donchian(laggingSpan2Periods)
+
+// Divergence Logic
+pivotHigh = ta.pivothigh(srcH, pivotLookback, pivotLookback)
+pivotLow = ta.pivotlow(srcL, pivotLookback, pivotLookback)
+var float lastPivotHighRSI = na
+var float lastPivotLowRSI = na
+if not na(pivotHigh)
+    lastPivotHighRSI := rsi[pivotLookback]
+if not na(pivotLow)
+    lastPivotLowRSI := rsi[pivotLookback]
+
+bullishDiv = false
+if not na(pivotLow) and not na(lastPivotLowRSI)
+    bullishDiv := low[pivotLookback] < low[pivotLookback+1] and rsi[pivotLookback] > lastPivotLowRSI // Simplified check
+
+bearishDiv = false
+if not na(pivotHigh) and not na(lastPivotHighRSI)
+    bearishDiv := high[pivotLookback] > high[pivotLookback+1] and rsi[pivotLookback] < lastPivotHighRSI
+
+// Trend & Conditions
+macroTrendBullish = ma2 > ta.ema(ma2, 100)
+currentTrendBullish = srcC > ma1 and ma1 > ma2
+bullishTrendShift = ta.crossover(ma1, ma2)
+bearishTrendShift = ta.crossunder(ma1, ma2)
+momentumBullish = momentum > 0 and momentum > momentum[1]
+structureBullish = high > high[5] and low > low[5]
+overbought = rsi > 70
+oversold = rsi < 30
+volumeBullish = srcV > volMA and srcC > srcO
+
+// Scoring
+bullishScore = 0
+bullishScore += currentTrendBullish ? 1 : 0
+bullishScore += momentumBullish ? 1 : 0
+bullishScore += structureBullish ? 1 : 0
+bullishScore += volumeBullish ? 1 : 0
+bullishScore += srcC > leadSpanA and srcC > leadSpanB ? 1 : 0
+bullishScore += macdHist > 0 ? 1 : 0
+
+bearishScore = 0
+bearishScore += not currentTrendBullish ? 1 : 0
+bearishScore += not momentumBullish ? 1 : 0
+bearishScore += not structureBullish ? 1 : 0
+bearishScore += not volumeBullish ? 1 : 0
+bearishScore += srcC < leadSpanA and srcC < leadSpanB ? 1 : 0
+bearishScore += macdHist < 0 ? 1 : 0
+
+// Signals
+rsiCrossOver30 = ta.crossover(rsi, 30)
+rsiCrossUnder70 = ta.crossunder(rsi, 70)
+var int lastBullBaseBar = na
+var int lastBearBaseBar = na
+if bullishDiv or bullishTrendShift or (oversold and rsiCrossOver30)
+    lastBullBaseBar := bar_index
+if bearishDiv or bearishTrendShift or (overbought and rsiCrossUnder70)
+    lastBearBaseBar := bar_index
+freshBull = not na(lastBullBaseBar) and (bar_index - lastBullBaseBar) <= signalMaxAgeEff
+freshBear = not na(lastBearBaseBar) and (bar_index - lastBearBaseBar) <= signalMaxAgeEff
+
+strongBull = bullishTrendShift and macdHist > 0 and momentumBullish
+strongBear = bearishTrendShift and macdHist < 0 and not momentumBullish
+
+buySignal = bullishDiv and bullishScore >= confluenceEff
+buySignal := buySignal or (bullishTrendShift and bullishScore >= confluenceEff)
+buySignal := buySignal or (strongBull and bullishScore >= (confluenceEff - 1))
+buySignal := buySignal or (oversold and rsiCrossOver30 and bullishScore >= confluenceEff)
+buySignal := buySignal and freshBull
+buySignal := buySignal and (is1 and not strongBull ? (currentTrendBullish and momentumBullish) : true)
+buySignal := buySignal and (lowTF and not strongBull ? macdHist > 0 : true)
+
+sellSignal = bearishDiv and bearishScore >= confluenceEff
+sellSignal := sellSignal or (bearishTrendShift and bearishScore >= confluenceEff)
+sellSignal := sellSignal or (strongBear and bearishScore >= (confluenceEff - 1))
+sellSignal := sellSignal or (overbought and rsiCrossUnder70 and bearishScore >= confluenceEff)
+sellSignal := sellSignal and freshBear
+sellSignal := sellSignal and (is1 and not strongBear ? (not currentTrendBullish and not momentumBullish) : true)
+sellSignal := sellSignal and (lowTF and not strongBear ? macdHist < 0 : true)
+
+// Plots
+plot(ma1, "Fast MA", color=color.new(color.blue, 0), linewidth=1)
+plot(ma2, "Slow MA", color=color.new(color.orange, 0), linewidth=2)
+plotshape(buySignal, "Buy Signal", shape.labelup, location.belowbar, color.new(color.green, 0), text="BUY", textcolor=color.white, size=size.small)
+plotshape(sellSignal, "Sell Signal", shape.labeldown, location.abovebar, color.new(color.red, 0), text="SELL", textcolor=color.white, size=size.small)
+
+if showTable
+    var table indicatorTable = table.new(position.top_right, 2, 4, border_width=1)
+    table.cell(indicatorTable, 0, 0, "Trend", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 0, currentTrendBullish ? "▲" : "▼", bgcolor=currentTrendBullish ? color.green : color.red, text_color=color.white)
+    table.cell(indicatorTable, 0, 1, "Mom", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 1, momentumBullish ? "▲" : "▼", bgcolor=momentumBullish ? color.green : color.red, text_color=color.white)
+    table.cell(indicatorTable, 0, 2, "Vol", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 2, volumeStrength ? "High" : "Low", bgcolor=volumeStrength ? color.green : color.red, text_color=color.white)
+
+// ==========================================
+// 2. ATR TRAILING STOP
+// ==========================================
+group_atr = "=== ATR Trailing Stop ==="
+atrMult = input.float(2.0, "ATR Multiplier", step=0.1, group=group_atr)
+showAtrLabels = input.bool(true, "Show Stop Labels", group=group_atr)
+
+stopDist = atrValue * atrMult
+var float longStop = na
+var float shortStop = na
+var int dir = 1
+
+longStopCandidate = srcC - stopDist
+shortStopCandidate = srcC + stopDist
+
+longStop := if (srcC > longStop[1])
+    math.max(longStopCandidate, nz(longStop[1]))
+else
+    longStopCandidate
+
+shortStop := if (srcC < shortStop[1])
+    math.min(shortStopCandidate, nz(shortStop[1]))
+else
+    shortStopCandidate
+
+if (srcC > nz(shortStop[1]) and dir == -1)
+    dir := 1
+else if (srcC < nz(longStop[1]) and dir == 1)
+    dir := -1
+
+activeStop = dir == 1 ? longStop : shortStop
+stopColor = dir == 1 ? color.new(color.green, 0) : color.new(color.red, 0)
+plot(activeStop, "Trailing Stop", color=stopColor, linewidth=2, style=plot.style_linebr)
+
+var label priceLabel = na
+if showAtrLabels and barstate.islast
+    label.delete(priceLabel)
+    priceLabel := label.new(x=bar_index + 1, y=activeStop, text="SL: " + str.tostring(math.round_to_mintick(activeStop)), color=stopColor, textcolor=color.white, style=label.style_label_left, size=size.small)
+
+// ==========================================
+// 3. INSTITUTIONAL VWAP
+// ==========================================
+group_vwap = "=== Institutional VWAP ==="
+showVwapBands = input.bool(true, "Show VWAP Bands", group=group_vwap)
+stdevMultVwap = input.float(1.5, "VWAP Stdev", step=0.1, group=group_vwap)
+
+startPeriod = timeframe.change("D")
+var float sumSrcVol = 0.0
+var float sumVol = 0.0
+var float sumSrcSrcVol = 0.0
+
+if startPeriod
+    sumSrcVol := 0.0
+    sumVol := 0.0
+    sumSrcSrcVol := 0.0
+
+sumSrcVol += hlc3 * volume
+sumVol += volume
+sumSrcSrcVol += volume * math.pow(hlc3, 2)
+
+vwapValue = sumSrcVol / sumVol
+variance = sumSrcSrcVol / sumVol - math.pow(vwapValue, 2)
+stdev = math.sqrt(math.max(variance, 0))
+upperBand = vwapValue + stdev * stdevMultVwap
+lowerBand = vwapValue - stdev * stdevMultVwap
+
+vwapTrend = close > vwapValue ? 1 : -1
+vwapColor = vwapTrend == 1 ? color.new(color.green, 0) : color.new(color.red, 0)
+
+plot(vwapValue, "VWAP", color=vwapColor, linewidth=1)
+p1 = plot(showVwapBands ? upperBand : na, "VWAP Upper", color=color.new(color.gray, 80))
+p2 = plot(showVwapBands ? lowerBand : na, "VWAP Lower", color=color.new(color.gray, 80))
+fill(p1, p2, color=color.new(vwapColor, 95))
+
+// ==========================================
+// 4. AUTO ORDER BLOCKS
+// ==========================================
+group_ob = "=== Auto Order Blocks ==="
+obLookback = input.int(5, "OB Pivot Lookback", minval=1, group=group_ob)
+obTransp = input.int(85, "OB Transparency", minval=0, maxval=100, group=group_ob)
+
+ph = ta.pivothigh(high, obLookback, obLookback)
+pl = ta.pivotlow(low, obLookback, obLookback)
+
+var box[] bullBoxes = array.new_box()
+var box[] bearBoxes = array.new_box()
+
+// Clean Bull Boxes
+if array.size(bullBoxes) > 0
+    for i = array.size(bullBoxes) - 1 to 0
+        b = array.get(bullBoxes, i)
+        if close < box.get_bottom(b)
+            box.delete(b)
+            array.remove(bullBoxes, i)
+
+// Clean Bear Boxes
+if array.size(bearBoxes) > 0
+    for i = array.size(bearBoxes) - 1 to 0
+        b = array.get(bearBoxes, i)
+        if close > box.get_top(b)
+            box.delete(b)
+            array.remove(bearBoxes, i)
+
+// New Bull OB
+if not na(pl)
+    b = box.new(left=bar_index - obLookback, top=high[obLookback], bottom=low[obLookback], right=bar_index + 50, 
+         bgcolor=color.new(color.green, obTransp), border_color=color.new(color.green, 80))
+    array.push(bullBoxes, b)
+
+// New Bear OB
+if not na(ph)
+    b = box.new(left=bar_index - obLookback, top=high[obLookback], bottom=low[obLookback], right=bar_index + 50, 
+         bgcolor=color.new(color.red, obTransp), border_color=color.new(color.red, 80))
+    array.push(bearBoxes, b)
+
+// Extend
+if array.size(bullBoxes) > 0
+    if array.size(bullBoxes) > 10
+        box.delete(array.shift(bullBoxes))
+    for i = 0 to array.size(bullBoxes) - 1
+        box.set_right(array.get(bullBoxes, i), bar_index + 10)
+
+if array.size(bearBoxes) > 0
+    if array.size(bearBoxes) > 10
+        box.delete(array.shift(bearBoxes))
+    for i = 0 to array.size(bearBoxes) - 1
+        box.set_right(array.get(bearBoxes, i), bar_index + 10)

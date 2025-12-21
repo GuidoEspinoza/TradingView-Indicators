@@ -1,0 +1,84 @@
+//@version=6
+indicator("Professional Auto Order Blocks", shorttitle="Auto OB", overlay=true, max_boxes_count=500)
+
+// ==================== CONFIGURACIÓN ====================
+group_sett = "Configuración"
+pivotLookback = input.int(5, "Pivot Lookback", minval=1, group=group_sett)
+obBoxTransp = input.int(80, "Transparencia de Cajas", minval=0, maxval=100, group=group_sett)
+showLabels = input.bool(false, "Mostrar Etiquetas", group=group_sett)
+
+group_cols = "Colores"
+colBull = input.color(color.new(color.green, 0), "Bullish OB", group=group_cols)
+colBear = input.color(color.new(color.red, 0), "Bearish OB", group=group_cols)
+
+// ==================== LÓGICA DE DETECCIÓN ====================
+ph = ta.pivothigh(high, pivotLookback, pivotLookback)
+pl = ta.pivotlow(low, pivotLookback, pivotLookback)
+
+// Usamos dos arrays separados para saber qué tipo de OB es cada uno
+var box[] bullBoxes = array.new_box()
+var box[] bearBoxes = array.new_box()
+
+// Función para limpiar cajas alcistas (Soportes rotos)
+clean_bull_boxes() =>
+    if array.size(bullBoxes) > 0
+        for i = array.size(bullBoxes) - 1 to 0
+            b = array.get(bullBoxes, i)
+            bottom = box.get_bottom(b)
+            // Si el precio cierra por debajo del soporte, está mitigado/roto
+            if close < bottom
+                box.delete(b)
+                array.remove(bullBoxes, i)
+
+// Función para limpiar cajas bajistas (Resistencias rotas)
+clean_bear_boxes() =>
+    if array.size(bearBoxes) > 0
+        for i = array.size(bearBoxes) - 1 to 0
+            b = array.get(bearBoxes, i)
+            top = box.get_top(b)
+            // Si el precio cierra por encima de la resistencia, está mitigado/roto
+            if close > top
+                box.delete(b)
+                array.remove(bearBoxes, i)
+
+// Detectar Bullish OB (Soporte)
+if not na(pl)
+    idx = bar_index - pivotLookback
+    // Dibujamos la caja en la vela pivot
+    b = box.new(left=idx, top=high[pivotLookback], bottom=low[pivotLookback], right=bar_index + 50, 
+         bgcolor=color.new(colBull, obBoxTransp), border_color=color.new(colBull, 50), 
+         text=showLabels ? "Bull OB" : "", text_size=size.tiny, text_color=color.new(colBull, 0))
+    array.push(bullBoxes, b)
+
+// Detectar Bearish OB (Resistencia)
+if not na(ph)
+    idx = bar_index - pivotLookback
+    b = box.new(left=idx, top=high[pivotLookback], bottom=low[pivotLookback], right=bar_index + 50, 
+         bgcolor=color.new(colBear, obBoxTransp), border_color=color.new(colBear, 50),
+         text=showLabels ? "Bear OB" : "", text_size=size.tiny, text_color=color.new(colBear, 0))
+    array.push(bearBoxes, b)
+
+// Mantenimiento (Limpiar y Extender)
+clean_bull_boxes()
+clean_bear_boxes()
+
+// Extender Bullish Boxes
+if array.size(bullBoxes) > 0
+    // Limitar cantidad para rendimiento
+    if array.size(bullBoxes) > 10
+        box.delete(array.shift(bullBoxes))
+    for i = 0 to array.size(bullBoxes) - 1
+        b = array.get(bullBoxes, i)
+        box.set_right(b, bar_index + 10)
+
+// Extender Bearish Boxes
+if array.size(bearBoxes) > 0
+    if array.size(bearBoxes) > 10
+        box.delete(array.shift(bearBoxes))
+    for i = 0 to array.size(bearBoxes) - 1
+        b = array.get(bearBoxes, i)
+        box.set_right(b, bar_index + 10)
+
+// ==================== ALERTAS ====================
+alertcondition(not na(pl), "New Bullish OB", "Nuevo Order Block Alcista Detectado")
+alertcondition(not na(ph), "New Bearish OB", "Nuevo Order Block Bajista Detectado")

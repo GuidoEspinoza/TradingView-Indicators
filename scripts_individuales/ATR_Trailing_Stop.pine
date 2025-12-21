@@ -1,0 +1,60 @@
+//@version=6
+indicator("Professional ATR Trailing Stop", shorttitle="ATR Stop", overlay=true)
+
+// ==================== CONFIGURACIÓN ====================
+group_sett = "Configuración Principal"
+length = input.int(14, "Periodo ATR", minval=1, group=group_sett)
+mult = input.float(2.0, "Multiplicador ATR", step=0.1, group=group_sett, tooltip="Recomendado: 1.5 para Scalping agresivo, 2.0 para Intraday (15m/30m)")
+src = input.source(close, "Fuente", group=group_sett)
+
+group_vis = "Visualización"
+showLabels = input.bool(true, "Mostrar Etiquetas de Precio", group=group_vis)
+lineThickness = input.int(2, "Grosor de Línea", minval=1, maxval=4, group=group_vis)
+
+// ==================== CÁLCULOS ====================
+atr = ta.atr(length)
+stopDist = atr * mult
+
+// Lógica del Trailing Stop
+var float longStop = na
+var float shortStop = na
+var int dir = 1 // 1 = Alcista, -1 = Bajista
+
+// Cálculo de niveles potenciales
+longStopCandidate = src - stopDist
+shortStopCandidate = src + stopDist
+
+// Actualización de Stops (Solo se mueven a favor, nunca en contra)
+longStop := if (src > longStop[1])
+    math.max(longStopCandidate, nz(longStop[1]))
+else
+    longStopCandidate
+
+shortStop := if (src < shortStop[1])
+    math.min(shortStopCandidate, nz(shortStop[1]))
+else
+    shortStopCandidate
+
+// Detección de cambio de tendencia
+if (src > nz(shortStop[1]) and dir == -1)
+    dir := 1
+else if (src < nz(longStop[1]) and dir == 1)
+    dir := -1
+
+// Selección del Stop activo
+activeStop = dir == 1 ? longStop : shortStop
+
+// ==================== VISUALIZACIÓN ====================
+stopColor = dir == 1 ? color.new(color.green, 0) : color.new(color.red, 0)
+p1 = plot(activeStop, "Trailing Stop", color=stopColor, linewidth=lineThickness, style=plot.style_linebr)
+
+// Etiquetas de precio en el eje (Usando Labels dinámicos)
+var label priceLabel = na
+if showLabels and barstate.islast
+    label.delete(priceLabel)
+    priceLabel := label.new(x=bar_index + 1, y=activeStop, text=str.tostring(math.round_to_mintick(activeStop)), color=stopColor, textcolor=color.white, style=label.style_label_left, size=size.small)
+
+// ==================== ALERTAS ====================
+alertcondition(ta.cross(src, activeStop), "Trend Change", "El precio ha cruzado el ATR Trailing Stop")
+alertcondition(dir == 1 and dir[1] == -1, "Buy Signal", "Cambio a Tendencia Alcista (Buy)")
+alertcondition(dir == -1 and dir[1] == 1, "Sell Signal", "Cambio a Tendencia Bajista (Sell)")
