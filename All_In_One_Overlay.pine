@@ -35,6 +35,16 @@ showDivergence = input.bool(true, "Show Divergence", group=group_conf)
 showTrendShift = input.bool(true, "Show Trend Shifts", group=group_conf)
 showTable = input.bool(true, "Show Info Table", group=group_conf)
 
+group_filter = "=== MTF Trend Filter ==="
+useTrendFilter = input.bool(true, "Enable Trend Filter", group=group_filter)
+filterTf_input = input.string("Auto", "Filter Timeframe", options=["Auto", "1", "3", "5", "15", "30", "60", "240", "D"], group=group_filter)
+
+// Determinar el timeframe del filtro real. Si es "Auto", se ajusta dinámicamente.
+string filterTf = if filterTf_input == "Auto"
+    timeframe.isintraday and timeframe.multiplier <= 5 ? "5" : "60"
+else
+    filterTf_input
+
 // Timeframe Logic
 useCurrentRes = input.bool(true, "Use Current Chart Resolution?", group=group_conf)
 resCustom = input.string("60", "Use Different Timeframe", options=["1","5","15","30","60","240"], group=group_conf)
@@ -80,6 +90,11 @@ momentum = ta.mom(srcC, momentumLengthEff)
 volMA = ta.sma(srcV, volumeMAEff)
 volumeStrength = srcV > volMA
 trendStrength = math.abs(ma1 - ma2) / atrValue
+
+// MTF Trend Filter Logic
+filterClose = request.security(syminfo.tickerid, filterTf, srcC, barmerge.gaps_off, barmerge.lookahead_off)
+filterMA = request.security(syminfo.tickerid, filterTf, ma2, barmerge.gaps_off, barmerge.lookahead_off)
+mainTrendUp = filterClose > filterMA
 
 // Ichimoku
 donchian(len) => math.avg(ta.lowest(srcL, len), ta.highest(srcH, len))
@@ -156,6 +171,7 @@ buySignal := buySignal or (oversold and rsiCrossOver30 and bullishScore >= confl
 buySignal := buySignal and freshBull
 buySignal := buySignal and (is1 and not strongBull ? (currentTrendBullish and momentumBullish) : true)
 buySignal := buySignal and (lowTF and not strongBull ? macdHist > 0 : true)
+buySignal := buySignal and (not useTrendFilter or mainTrendUp)
 
 sellSignal = bearishDiv and bearishScore >= confluenceEff
 sellSignal := sellSignal or (bearishTrendShift and bearishScore >= confluenceEff)
@@ -164,6 +180,7 @@ sellSignal := sellSignal or (overbought and rsiCrossUnder70 and bearishScore >= 
 sellSignal := sellSignal and freshBear
 sellSignal := sellSignal and (is1 and not strongBear ? (not currentTrendBullish and not momentumBullish) : true)
 sellSignal := sellSignal and (lowTF and not strongBear ? macdHist < 0 : true)
+sellSignal := sellSignal and (not useTrendFilter or not mainTrendUp)
 
 // Plots
 plot(ma1, "Fast MA", color=color.new(color.blue, 0), linewidth=1)
@@ -172,13 +189,17 @@ plotshape(buySignal, "Buy Signal", shape.labelup, location.belowbar, color.new(c
 plotshape(sellSignal, "Sell Signal", shape.labeldown, location.abovebar, color.new(color.red, 0), text="SELL", textcolor=color.white, size=size.small)
 
 if showTable
-    var table indicatorTable = table.new(position.top_right, 2, 4, border_width=1)
-    table.cell(indicatorTable, 0, 0, "Trend", bgcolor=color.gray, text_color=color.white)
-    table.cell(indicatorTable, 1, 0, currentTrendBullish ? "▲" : "▼", bgcolor=currentTrendBullish ? color.green : color.red, text_color=color.white)
-    table.cell(indicatorTable, 0, 1, "Mom", bgcolor=color.gray, text_color=color.white)
-    table.cell(indicatorTable, 1, 1, momentumBullish ? "▲" : "▼", bgcolor=momentumBullish ? color.green : color.red, text_color=color.white)
-    table.cell(indicatorTable, 0, 2, "Vol", bgcolor=color.gray, text_color=color.white)
-    table.cell(indicatorTable, 1, 2, volumeStrength ? "High" : "Low", bgcolor=volumeStrength ? color.green : color.red, text_color=color.white)
+    var table indicatorTable = table.new(position.top_right, 2, 5, border_width=1)
+    // Main Trend Filter
+    table.cell(indicatorTable, 0, 0, "Filtro " + filterTf, bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 0, useTrendFilter ? (mainTrendUp ? "▲" : "▼") : "—", bgcolor=useTrendFilter ? (mainTrendUp ? color.green : color.red) : color.gray, text_color=color.white)
+    // Current TF Indicators
+    table.cell(indicatorTable, 0, 1, "Tendencia " + tf, bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 1, currentTrendBullish ? "▲" : "▼", bgcolor=currentTrendBullish ? color.green : color.red, text_color=color.white)
+    table.cell(indicatorTable, 0, 2, "Mom", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 2, momentumBullish ? "▲" : "▼", bgcolor=momentumBullish ? color.green : color.red, text_color=color.white)
+    table.cell(indicatorTable, 0, 3, "Vol", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 3, volumeStrength ? "High" : "Low", bgcolor=volumeStrength ? color.green : color.red, text_color=color.white)
 
 // ==========================================
 // 2. ATR TRAILING STOP
