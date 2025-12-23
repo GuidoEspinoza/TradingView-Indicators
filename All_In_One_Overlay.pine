@@ -73,6 +73,11 @@ volumeMAEff = useAutoParams ? (is1 ? 32 : is3 ? 35 : is5 ? 40 : is15 ? 50 : is30
 confluenceEff = lowTF ? (is1 ? 2 : is3 ? 3 : is5 ? 3 : 3) : confluenceRequired
 signalMaxAgeEff = lowTF ? (is1 ? 3 : is3 ? 3 : is5 ? 3 : 2) : signalMaxAge
 
+// Ichimoku Effective Params
+conversionEff = useAutoParams ? (is1 ? 5 : is3 ? 9 : is5 ? 9 : is15 ? 9 : is30 ? 12 : is60 ? 9 : is240 ? 9 : conversionPeriods) : conversionPeriods
+baseEff = useAutoParams ? (is1 ? 10 : is3 ? 26 : is5 ? 20 : is15 ? 26 : is30 ? 30 : is60 ? 26 : is240 ? 26 : basePeriods) : basePeriods
+leadingSpanBEff = useAutoParams ? (is1 ? 20 : is3 ? 52 : is5 ? 40 : is15 ? 52 : is30 ? 60 : is60 ? 52 : is240 ? 52 : laggingSpan2Periods) : laggingSpan2Periods
+
 // Data Fetching (Anti-Repainting)
 srcO = request.security(syminfo.tickerid, tf, open, barmerge.gaps_off, barmerge.lookahead_off)
 srcH = request.security(syminfo.tickerid, tf, high, barmerge.gaps_off, barmerge.lookahead_off)
@@ -98,10 +103,10 @@ mainTrendUp = filterClose > filterMA
 
 // Ichimoku
 donchian(len) => math.avg(ta.lowest(srcL, len), ta.highest(srcH, len))
-conversionLine = donchian(conversionPeriods)
-baseLine = donchian(basePeriods)
+conversionLine = donchian(conversionEff)
+baseLine = donchian(baseEff)
 leadSpanA = math.avg(conversionLine, baseLine)
-leadSpanB = donchian(laggingSpan2Periods)
+leadSpanB = donchian(leadingSpanBEff)
 
 // Divergence Logic
 pivotHigh = ta.pivothigh(srcH, pivotLookback, pivotLookback)
