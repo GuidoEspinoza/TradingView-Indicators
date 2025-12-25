@@ -8,7 +8,7 @@ Este proyecto contiene una suite profesional de indicadores para TradingView, op
 Diseñados para cuentas gratuitas de TradingView (máximo 2 indicadores por gráfico).
 
 - **`All_In_One_Overlay.pine`** (Panel Principal)
-  - **Auto Multi-Confluence Signal**: Señales de entrada basadas en 3/6 confluencias.
+  - **Auto Multi-Confluence Signal**: Alertas de dos niveles (Triángulos de Confluencia y Diamantes de Momentum).
   - **Institutional VWAP**: Referencia de precio promedio ponderado por volumen.
   - **Auto Order Blocks**: Zonas de oferta y demanda automáticas.
   - **ATR Trailing Stop**: Línea dinámica para gestión de stop loss.

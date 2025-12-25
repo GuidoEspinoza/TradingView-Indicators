@@ -32,8 +32,18 @@ displacement = input.int(26, "Displacement", group=group_conf)
 confluenceRequired = input.int(3, "Min Confluence", minval=1, maxval=6, group=group_conf)
 signalMaxAge = input.int(3, "Max Bars Since Base", minval=1, group=group_conf)
 showDivergence = input.bool(true, "Show Divergence", group=group_conf)
+showSignals = input.bool(true, "Show Buy/Sell Signals", group=group_conf)
+showMacdCrossAlerts = input.bool(true, "Show MACD Cross Alerts", group=group_conf)
 showTrendShift = input.bool(true, "Show Trend Shifts", group=group_conf)
 showTable = input.bool(true, "Show Info Table", group=group_conf)
+
+group_weights = "=== Scoring Weights ==="
+wTrend = input.int(2, "Trend Weight", group=group_weights, minval=0)
+wMomentum = input.int(1, "Momentum Weight", group=group_weights, minval=0)
+wStructure = input.int(1, "Structure Weight", group=group_weights, minval=0)
+wVolume = input.int(1, "Volume Weight", group=group_weights, minval=0)
+wIchimoku = input.int(1, "Ichimoku Weight", group=group_weights, minval=0)
+wMacd = input.int(1, "MACD Weight", group=group_weights, minval=0)
 
 group_filter = "=== MTF Trend Filter ==="
 useTrendFilter = input.bool(true, "Enable Trend Filter", group=group_filter)
@@ -108,23 +118,33 @@ baseLine = donchian(baseEff)
 leadSpanA = math.avg(conversionLine, baseLine)
 leadSpanB = donchian(leadingSpanBEff)
 
-// Divergence Logic
-pivotHigh = ta.pivothigh(srcH, pivotLookback, pivotLookback)
-pivotLow = ta.pivotlow(srcL, pivotLookback, pivotLookback)
-var float lastPivotHighRSI = na
-var float lastPivotLowRSI = na
-if not na(pivotHigh)
-    lastPivotHighRSI := rsi[pivotLookback]
-if not na(pivotLow)
-    lastPivotLowRSI := rsi[pivotLookback]
+// Divergence Logic (V2.1 - Fixed Types)
+pivoth_val_price = ta.pivothigh(srcH, pivotLookback, pivotLookback)
+pivotl_val_price = ta.pivotlow(srcL, pivotLookback, pivotLookback)
 
-bullishDiv = false
-if not na(pivotLow) and not na(lastPivotLowRSI)
-    bullishDiv := low[pivotLookback] < low[pivotLookback+1] and rsi[pivotLookback] > lastPivotLowRSI // Simplified check
+// Create boolean series for pivot occurrences
+bool pivoth_detected = not na(pivoth_val_price)
+bool pivotl_detected = not na(pivotl_val_price)
 
-bearishDiv = false
-if not na(pivotHigh) and not na(lastPivotHighRSI)
-    bearishDiv := high[pivotLookback] > high[pivotLookback+1] and rsi[pivotLookback] < lastPivotHighRSI
+// Bearish Divergence: Higher High in Price, Lower High in RSI
+// Get price and RSI at the current pivot high
+float ph_price = ta.valuewhen(pivoth_detected, srcH[pivotLookback], 0)
+float ph_rsi = ta.valuewhen(pivoth_detected, rsi[pivotLookback], 0)
+// Get price and RSI at the previous pivot high
+float ph_price_prev = ta.valuewhen(pivoth_detected, srcH[pivotLookback], 1)
+float ph_rsi_prev = ta.valuewhen(pivoth_detected, rsi[pivotLookback], 1)
+
+bearishDiv = pivoth_detected and (ph_price > ph_price_prev) and (ph_rsi < ph_rsi_prev)
+
+// Bullish Divergence: Lower Low in Price, Higher Low in RSI
+// Get price and RSI at the current pivot low
+float pl_price = ta.valuewhen(pivotl_detected, srcL[pivotLookback], 0)
+float pl_rsi = ta.valuewhen(pivotl_detected, rsi[pivotLookback], 0)
+// Get price and RSI at the previous pivot low
+float pl_price_prev = ta.valuewhen(pivotl_detected, srcL[pivotLookback], 1)
+float pl_rsi_prev = ta.valuewhen(pivotl_detected, rsi[pivotLookback], 1)
+
+bullishDiv = pivotl_detected and (pl_price < pl_price_prev) and (pl_rsi > pl_rsi_prev)
 
 // Trend & Conditions
 macroTrendBullish = ma2 > ta.ema(ma2, 100)
@@ -137,22 +157,26 @@ overbought = rsi > 70
 oversold = rsi < 30
 volumeBullish = srcV > volMA and srcC > srcO
 
-// Scoring
+// Scoring (Weighted)
 bullishScore = 0
-bullishScore += currentTrendBullish ? 1 : 0
-bullishScore += momentumBullish ? 1 : 0
-bullishScore += structureBullish ? 1 : 0
-bullishScore += volumeBullish ? 1 : 0
-bullishScore += srcC > leadSpanA and srcC > leadSpanB ? 1 : 0
-bullishScore += macdHist > 0 ? 1 : 0
+bullishScore += currentTrendBullish ? wTrend : 0
+bullishScore += momentumBullish ? wMomentum : 0
+bullishScore += structureBullish ? wStructure : 0
+bullishScore += volumeBullish ? wVolume : 0
+bullishScore += (srcC > leadSpanA and srcC > leadSpanB) ? wIchimoku : 0
+bullishScore += macdHist > 0 ? wMacd : 0
 
 bearishScore = 0
-bearishScore += not currentTrendBullish ? 1 : 0
-bearishScore += not momentumBullish ? 1 : 0
-bearishScore += not structureBullish ? 1 : 0
-bearishScore += not volumeBullish ? 1 : 0
-bearishScore += srcC < leadSpanA and srcC < leadSpanB ? 1 : 0
-bearishScore += macdHist < 0 ? 1 : 0
+bearishScore += not currentTrendBullish ? wTrend : 0
+bearishScore += not momentumBullish ? wMomentum : 0
+bearishScore += not structureBullish ? wStructure : 0
+bearishScore += not volumeBullish ? wVolume : 0
+bearishScore += (srcC < leadSpanA and srcC < leadSpanB) ? wIchimoku : 0
+bearishScore += macdHist < 0 ? wMacd : 0
+
+// MACD Cross Events
+macdBullishCross = ta.crossover(macdLine, signalLine)
+macdBearishCross = ta.crossunder(macdLine, signalLine)
 
 // Signals
 rsiCrossOver30 = ta.crossover(rsi, 30)
@@ -190,8 +214,14 @@ sellSignal := sellSignal and (not useTrendFilter or not mainTrendUp)
 // Plots
 plot(ma1, "Fast MA", color=color.new(color.blue, 0), linewidth=1)
 plot(ma2, "Slow MA", color=color.new(color.orange, 0), linewidth=2)
-plotshape(buySignal, "Buy Signal", shape.labelup, location.belowbar, color.new(color.green, 0), text="BUY", textcolor=color.white, size=size.small)
-plotshape(sellSignal, "Sell Signal", shape.labeldown, location.abovebar, color.new(color.red, 0), text="SELL", textcolor=color.white, size=size.small)
+
+// Signal Plots (as arrows)
+plotshape(showSignals and buySignal, "Buy Alert", shape.triangleup, location.belowbar, color.new(color.blue, 0), size=size.tiny)
+plotshape(showSignals and sellSignal, "Sell Alert", shape.triangledown, location.abovebar, color.new(color.blue, 0), size=size.tiny)
+
+// MACD Cross Plots (as diamonds)
+plotshape(showMacdCrossAlerts and macdBullishCross, "MACD Bull Cross", shape.diamond, location.belowbar, color.new(color.yellow, 0), size=size.tiny)
+plotshape(showMacdCrossAlerts and macdBearishCross, "MACD Bear Cross", shape.diamond, location.abovebar, color.new(color.yellow, 0), size=size.tiny)
 
 if showTable
     var table indicatorTable = table.new(position.top_right, 2, 5, border_width=1)

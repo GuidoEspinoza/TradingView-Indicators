@@ -21,21 +21,25 @@ Antes de buscar señales, define el campo de juego.
 ## 2. EL GATILLO (La Señal)
 Una vez que el contexto es favorable (ej: Precio sobre VWAP y sin techos cercanos):
 
-### Espera la etiqueta "BUY" o "SELL"
-*   Esta etiqueta es tu alerta. **NO** entres inmediatamente cuando aparece.
-*   **Regla de Oro:** Espera al **CIERRE DE VELA**. Si la vela cierra y la etiqueta sigue ahí, pasamos al paso 3.
+### Espera la Alerta de Confluencia (Triángulo Azul)
+*   Este triángulo es tu alerta principal. **NO** entres inmediatamente cuando aparece.
+*   **Regla de Oro:** Espera al **CIERRE DE VELA**. Si la vela cierra y el triángulo sigue ahí, pasamos al paso 3.
 
 ---
 
 ## 3. LA CONFIRMACIÓN (El Juicio Final)
-Mira el panel inferior (MACD + RVOL).
+Observa el contexto de la señal y los indicadores inferiores.
 
-### A. MACD (Momentum)
+### A. Alerta de Momentum (Diamante Amarillo)
+*   Este diamante te avisa de un **cruce en el MACD** (cambio de momentum).
+*   **Señal Ideal:** Un Triángulo Azul aparece y, en la misma vela o una vela antes, aparece un Diamante Amarillo en la misma dirección. Esto es una **confirmación de momentum** y da mucha fuerza a la señal.
+*   **Señal de Cautela:** Un Triángulo Azul aparece, pero el MACD (y el diamante) van en dirección contraria. Esto es una **divergencia de momentum**. ANULA LA OPERACIÓN o espera más confirmación.
+
+### B. MACD (Análisis Profundo)
 *   **Para Compras:** ¿El histograma es verde o está cruzando hacia arriba?
 *   **Para Ventas:** ¿El histograma es rojo o está cruzando hacia abajo?
-*   *Si el MACD contradice la señal (ej: Señal BUY pero MACD bajando fuerte), ANULA LA OPERACIÓN.*
 
-### B. RVOL (Volumen Real - El Detector de Mentiras)
+### C. RVOL (Volumen Real - El Detector de Mentiras)
 Mira la barra de volumen correspondiente a la vela de señal.
 *   **Barra Verde/Amarilla:** ✅ Luz Verde. Los bancos están entrando. **ENTRA.**
 *   **Barra Gris:** ⚠️ Precaución. Puedes entrar, pero reduce riesgo.
@@ -69,8 +73,8 @@ Mira la barra de volumen correspondiente a la vela de señal.
 | :--- | :--- | :--- | :--- |
 | **1** | **VWAP** | Precio > Línea Central | Precio < Línea Central |
 | **2** | **Bloques** | No hay Caja Roja cerca arriba | No hay Caja Verde cerca abajo |
-| **3** | **Señal** | Etiqueta **BUY** confirmada | Etiqueta **SELL** confirmada |
-| **4** | **MACD** | Histograma Verde / Cruzando Up | Histograma Rojo / Cruzando Down |
+| **3** | **Señal** | Triángulo **Azul** confirmado | Triángulo **Azul** confirmado |
+| **4** | **Momentum**| Diamante Amarillo + MACD Verde | Diamante Amarillo + MACD Rojo |
 | **5** | **RVOL** | Barra Verde o Amarilla | Barra Verde o Amarilla |
 | **6** | **Ejecutar** | Buy Stop + SL en Línea Verde | Sell Stop + SL en Línea Roja |
 
