@@ -27,7 +27,7 @@ hline(1.0, "Avg Vol", color=color.gray, linestyle=hline.style_dotted)
 // 2. AUTO MACD (FRENTE)
 // ==========================================
 group_macd = "=== MACD Settings ==="
-useAuto = input.bool(true, "Auto-Adjust Params", group=group_macd)
+useAuto = input.bool(false, "Auto-Adjust Params", group=group_macd) // Disabled by default for synchronization
 fastLen = input.int(12, "Fast Length", group=group_macd)
 slowLen = input.int(26, "Slow Length", group=group_macd)
 sigLen = input.int(9, "Signal Length", group=group_macd)

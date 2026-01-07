@@ -13,10 +13,15 @@ macdSignal = input.int(9, "MACD Signal", group=group_conf)
 pivotLookback = input.int(5, "Pivot Lookback", group=group_conf)
 
 // Trend Settings
-trendMA1 = input.int(20, "Fast MA", group=group_conf)
-trendMA2 = input.int(100, "Slow MA (Trend)", group=group_conf) // Ajustado a 100 por defecto para intradía
+trendMA1 = input.int(9, "Fast MA", group=group_conf) // Sync with Bot (9)
+trendMA2 = input.int(21, "Slow MA (Trend)", group=group_conf) // Sync with Bot (21)
 maType = input.string("EMA", "MA Type", options=["SMA", "EMA"], group=group_conf)
 atrLen = input.int(14, "ATR Length", group=group_conf)
+
+// ADX Settings (New for Bot Sync)
+adxLen = input.int(14, "ADX Smoothing", group=group_conf)
+diLen = input.int(14, "DI Length", group=group_conf)
+adxThreshold = input.int(20, "Min ADX Strength", group=group_conf)
 
 // Momentum & Volume
 momentumLength = input.int(14, "Momentum Period", group=group_conf)
@@ -29,7 +34,7 @@ laggingSpan2Periods = input.int(52, "Leading Span B", group=group_conf)
 displacement = input.int(26, "Displacement", group=group_conf)
 
 // Signal Logic
-confluenceRequired = input.int(3, "Min Confluence", minval=1, maxval=6, group=group_conf)
+confluenceRequired = input.int(4, "Min Confluence", minval=1, maxval=6, group=group_conf) // Sync with Bot (4)
 signalMaxAge = input.int(3, "Max Bars Since Base", minval=1, group=group_conf)
 showDivergence = input.bool(true, "Show Divergence", group=group_conf)
 showSignals = input.bool(true, "Show Buy/Sell Signals", group=group_conf)
@@ -58,7 +63,7 @@ else
 // Timeframe Logic
 useCurrentRes = input.bool(true, "Use Current Chart Resolution?", group=group_conf)
 resCustom = input.string("60", "Use Different Timeframe", options=["1","5","15","30","60","240"], group=group_conf)
-useAutoParams = input.bool(true, "Auto-Adjust Params", group=group_conf)
+useAutoParams = input.bool(false, "Auto-Adjust Params", group=group_conf) // Sync with Bot (False)
 
 tf = useCurrentRes ? timeframe.period : resCustom
 tfSec = timeframe.in_seconds(tf)
@@ -105,6 +110,10 @@ momentum = ta.mom(srcC, momentumLengthEff)
 volMA = ta.sma(srcV, volumeMAEff)
 volumeStrength = srcV > volMA
 trendStrength = math.abs(ma1 - ma2) / atrValue
+
+// ADX Calc
+[diplus, diminus, adx] = ta.dmi(diLen, adxLen)
+adxFilter = adx > adxThreshold
 
 // MTF Trend Filter Logic
 filterClose = request.security(syminfo.tickerid, filterTf, srcC, barmerge.gaps_off, barmerge.lookahead_off)
@@ -200,7 +209,6 @@ buySignal := buySignal or (oversold and rsiCrossOver30 and bullishScore >= confl
 buySignal := buySignal and freshBull
 buySignal := buySignal and (is1 and not strongBull ? (currentTrendBullish and momentumBullish) : true)
 buySignal := buySignal and (lowTF and not strongBull ? macdHist > 0 : true)
-buySignal := buySignal and (not useTrendFilter or mainTrendUp)
 
 sellSignal = bearishDiv and bearishScore >= confluenceEff
 sellSignal := sellSignal or (bearishTrendShift and bearishScore >= confluenceEff)
@@ -210,6 +218,10 @@ sellSignal := sellSignal and freshBear
 sellSignal := sellSignal and (is1 and not strongBear ? (not currentTrendBullish and not momentumBullish) : true)
 sellSignal := sellSignal and (lowTF and not strongBear ? macdHist < 0 : true)
 sellSignal := sellSignal and (not useTrendFilter or not mainTrendUp)
+
+// Global ADX Filter Application
+buySignal := buySignal and adxFilter
+sellSignal := sellSignal and adxFilter
 
 // Plots
 plot(ma1, "Fast MA", color=color.new(color.blue, 0), linewidth=1)
@@ -240,7 +252,7 @@ if showTable
 // 2. ATR TRAILING STOP
 // ==========================================
 group_atr = "=== ATR Trailing Stop ==="
-atrMult = input.float(2.0, "ATR Multiplier", step=0.1, group=group_atr)
+atrMult = input.float(2.5, "ATR Multiplier", step=0.1, group=group_atr) // Sync with Bot (2.5)
 showAtrLabels = input.bool(true, "Show Stop Labels", group=group_atr)
 
 stopDist = atrValue * atrMult
