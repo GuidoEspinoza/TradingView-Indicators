@@ -12,20 +12,20 @@ macdSlow = input.int(26, "MACD Slow", group=group_conf)
 macdSignal = input.int(9, "MACD Signal", group=group_conf)
 pivotLookback = input.int(5, "Pivot Lookback", group=group_conf)
 
-// Trend Settings
-trendMA1 = input.int(9, "Fast MA", group=group_conf) // Sync with Bot (9)
-trendMA2 = input.int(21, "Slow MA (Trend)", group=group_conf) // Sync with Bot (21)
+// Trend Settings (UPDATED TO MATCH BOT 'Intraday-Trend')
+trendMA1 = input.int(20, "Fast MA (Trend)", group=group_conf) // Sync with Bot (20)
+trendMA2 = input.int(100, "Slow MA (Trend)", group=group_conf) // Sync with Bot (100)
 maType = input.string("EMA", "MA Type", options=["SMA", "EMA"], group=group_conf)
 atrLen = input.int(14, "ATR Length", group=group_conf)
 
-// ADX Settings (New for Bot Sync)
+// ADX Settings (Sync with Bot)
 adxLen = input.int(14, "ADX Smoothing", group=group_conf)
 diLen = input.int(14, "DI Length", group=group_conf)
 adxThreshold = input.int(20, "Min ADX Strength", group=group_conf)
 
-// Momentum & Volume
+// Momentum & Volume (UPDATED TO MATCH BOT)
 momentumLength = input.int(14, "Momentum Period", group=group_conf)
-volumeMA = input.int(20, "Volume MA Length", group=group_conf)
+volumeMA = input.int(50, "Volume MA Length", group=group_conf) // Sync with Bot (50)
 
 // Ichimoku
 conversionPeriods = input.int(9, "Conversion Line", group=group_conf)
@@ -34,7 +34,7 @@ laggingSpan2Periods = input.int(52, "Leading Span B", group=group_conf)
 displacement = input.int(26, "Displacement", group=group_conf)
 
 // Signal Logic
-confluenceRequired = input.int(4, "Min Confluence", minval=1, maxval=6, group=group_conf) // Sync with Bot (4)
+confluenceRequired = input.int(4, "Min Confluence", minval=1, maxval=7, group=group_conf) // Sync with Bot (4)
 signalMaxAge = input.int(3, "Max Bars Since Base", minval=1, group=group_conf)
 showDivergence = input.bool(true, "Show Divergence", group=group_conf)
 showSignals = input.bool(true, "Show Buy/Sell Signals", group=group_conf)
@@ -42,8 +42,8 @@ showMacdCrossAlerts = input.bool(true, "Show MACD Cross Alerts", group=group_con
 showTrendShift = input.bool(true, "Show Trend Shifts", group=group_conf)
 showTable = input.bool(true, "Show Info Table", group=group_conf)
 
-group_weights = "=== Scoring Weights ==="
-wTrend = input.int(2, "Trend Weight", group=group_weights, minval=0)
+group_weights = "=== Scoring Weights (Sync with Bot: All 1) ==="
+wTrend = input.int(1, "Trend Weight", group=group_weights, minval=0) // Sync with Bot (Equal weight 1)
 wMomentum = input.int(1, "Momentum Weight", group=group_weights, minval=0)
 wStructure = input.int(1, "Structure Weight", group=group_weights, minval=0)
 wVolume = input.int(1, "Volume Weight", group=group_weights, minval=0)
@@ -56,7 +56,7 @@ filterTf_input = input.string("Auto", "Filter Timeframe", options=["Auto", "1", 
 
 // Determinar el timeframe del filtro real. Si es "Auto", se ajusta dinámicamente.
 string filterTf = if filterTf_input == "Auto"
-    timeframe.isintraday and timeframe.multiplier <= 5 ? "5" : "60"
+    timeframe.isintraday and timeframe.multiplier <= 5 ? "60" : "240" // Adjusted: H1 filter for M15, H4 for H1
 else
     filterTf_input
 
@@ -76,15 +76,15 @@ is60 = tfSec == 3600
 is240 = tfSec == 14400
 lowTF = is1 or is3 or is5
 
-// Effective Params
+// Effective Params (Still useful if Auto is enabled, but defaults match Bot now)
 rsiLenEff = useAutoParams ? (is1 ? 8 : is3 ? 10 : is5 ? 12 : is15 ? 14 : is30 ? 14 : is60 ? 14 : is240 ? 14 : rsiLength) : rsiLength
 macdFastEff = useAutoParams ? (is1 ? 6 : is3 ? 7 : is5 ? 8 : is15 ? 12 : is30 ? 12 : is60 ? 12 : is240 ? 12 : macdFast) : macdFast
 macdSlowEff = useAutoParams ? (is1 ? 13 : is3 ? 17 : is5 ? 20 : is15 ? 26 : is30 ? 26 : is60 ? 26 : is240 ? 26 : macdSlow) : macdSlow
 macdSignalEff = useAutoParams ? (is1 ? 4 : is3 ? 5 : is5 ? 6 : is15 ? 9 : is30 ? 9 : is60 ? 9 : is240 ? 9 : macdSignal) : macdSignal
-trendMA1Eff = useAutoParams ? (is1 ? 9 : is3 ? 12 : is5 ? 18 : is15 ? 20 : is30 ? 20 : is60 ? 50 : is240 ? 50 : trendMA1) : trendMA1
-trendMA2Eff = useAutoParams ? (is1 ? 24 : is3 ? 30 : is5 ? 50 : is15 ? 100 : is30 ? 100 : is60 ? 200 : is240 ? 200 : trendMA2) : trendMA2
+trendMA1Eff = useAutoParams ? (is1 ? 9 : is3 ? 12 : is5 ? 18 : is15 ? 20 : is30 ? 20 : is60 ? 20 : is240 ? 50 : trendMA1) : trendMA1
+trendMA2Eff = useAutoParams ? (is1 ? 24 : is3 ? 30 : is5 ? 50 : is15 ? 100 : is30 ? 100 : is60 ? 100 : is240 ? 200 : trendMA2) : trendMA2
 momentumLengthEff = useAutoParams ? (is1 ? 7 : is3 ? 9 : is5 ? 12 : is15 ? 14 : is30 ? 20 : is60 ? 20 : is240 ? 21 : momentumLength) : momentumLength
-volumeMAEff = useAutoParams ? (is1 ? 32 : is3 ? 35 : is5 ? 40 : is15 ? 50 : is30 ? 60 : is60 ? 70 : is240 ? 100 : volumeMA) : volumeMA
+volumeMAEff = useAutoParams ? (is1 ? 32 : is3 ? 35 : is5 ? 40 : is15 ? 50 : is30 ? 60 : is60 ? 50 : is240 ? 100 : volumeMA) : volumeMA
 confluenceEff = lowTF ? (is1 ? 2 : is3 ? 3 : is5 ? 3 : 3) : confluenceRequired
 signalMaxAgeEff = lowTF ? (is1 ? 3 : is3 ? 3 : is5 ? 3 : 2) : signalMaxAge
 
