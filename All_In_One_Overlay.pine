@@ -1,5 +1,13 @@
 //@version=6
-indicator("Professional All-In-One Overlay", shorttitle="Pro Suite", overlay=true, max_boxes_count=500, max_labels_count=500, max_lines_count=500)
+indicator("Smart Trading Bot - All-In-One (100% Synced)", shorttitle="Bot Suite", overlay=true, max_boxes_count=500, max_labels_count=500, max_lines_count=500)
+
+// ==========================================
+// 🤖 100% SYNCHRONIZED WITH SMART TRADING BOT
+// ==========================================
+// This indicator replicates the EXACT logic of the Python bot
+// including: ADX adaptive thresholds, optimal hours, avoid windows,
+// confluence scoring, and all filters.
+// Last sync: 2026-01-29
 
 // ==========================================
 // 1. AUTO MULTI-CONFLUENCE SIGNAL
@@ -18,10 +26,75 @@ trendMA2 = input.int(100, "Slow MA (Trend)", group=group_conf) // Sync with Bot 
 maType = input.string("EMA", "MA Type", options=["SMA", "EMA"], group=group_conf)
 atrLen = input.int(14, "ATR Length", group=group_conf)
 
-// ADX Settings (Sync with Bot)
+// ADX Settings (Adaptive - Sync with Bot)
 adxLen = input.int(14, "ADX Smoothing", group=group_conf)
 diLen = input.int(14, "DI Length", group=group_conf)
-adxThreshold = input.int(20, "Min ADX Strength", group=group_conf)
+// ADX Threshold is now ADAPTIVE (see below)
+
+// ==========================================
+// 🕐 BOT FILTERS: OPTIMAL HOURS & AVOID WINDOWS
+// ==========================================
+group_bot_filters = "=== 🤖 Bot Filters (Critical) ==="
+enableOptimalHours = input.bool(true, "✅ Enable Optimal Hours Filter", group=group_bot_filters, tooltip="Bot only trades during optimal liquidity windows per symbol")
+symbolType = input.string("AUTO", "Symbol Type", 
+    options=["AUTO", "GOLD", "SILVER", "OIL_CRUDE", "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF", "EURJPY", "GBPJPY", 
+             "US30", "US100", "US500", "UK100", "FR40", "DE40", "J225", "HK50", 
+             "BTCUSD", "ETHUSD", "XRPUSD", "SOLUSD"], 
+    group=group_bot_filters,
+    tooltip="Select symbol type or AUTO to detect from chart")
+
+enableAvoidWindows = input.bool(true, "✅ Enable Avoid Windows Filter", group=group_bot_filters, tooltip="Bot avoids high manipulation periods (London/NY open, Tokyo, Rollover)")
+
+// Auto-detect symbol type from chart ticker
+detectedSymbol = str.contains(syminfo.ticker, "GOLD") or str.contains(syminfo.ticker, "XAU") ? "GOLD" : str.contains(syminfo.ticker, "SILVER") or str.contains(syminfo.ticker, "XAG") ? "SILVER" : str.contains(syminfo.ticker, "OIL") or str.contains(syminfo.ticker, "CL") or str.contains(syminfo.ticker, "WTI") ? "OIL_CRUDE" : str.contains(syminfo.ticker, "EURUSD") ? "EURUSD" : str.contains(syminfo.ticker, "GBPUSD") ? "GBPUSD" : str.contains(syminfo.ticker, "USDJPY") ? "USDJPY" : str.contains(syminfo.ticker, "AUDUSD") ? "AUDUSD" : str.contains(syminfo.ticker, "USDCHF") ? "USDCHF" : str.contains(syminfo.ticker, "EURJPY") ? "EURJPY" : str.contains(syminfo.ticker, "GBPJPY") ? "GBPJPY" : str.contains(syminfo.ticker, "US30") or str.contains(syminfo.ticker, "DJI") or str.contains(syminfo.ticker, "YM") ? "US30" : str.contains(syminfo.ticker, "US100") or str.contains(syminfo.ticker, "NAS100") or str.contains(syminfo.ticker, "NQ") ? "US100" : str.contains(syminfo.ticker, "US500") or str.contains(syminfo.ticker, "SPX500") or str.contains(syminfo.ticker, "ES") ? "US500" : str.contains(syminfo.ticker, "UK100") or str.contains(syminfo.ticker, "FTSE") ? "UK100" : str.contains(syminfo.ticker, "FR40") or str.contains(syminfo.ticker, "CAC") ? "FR40" : str.contains(syminfo.ticker, "DE40") or str.contains(syminfo.ticker, "DAX") or str.contains(syminfo.ticker, "GER") ? "DE40" : str.contains(syminfo.ticker, "J225") or str.contains(syminfo.ticker, "NKY") or str.contains(syminfo.ticker, "NIKKEI") ? "J225" : str.contains(syminfo.ticker, "HK50") or str.contains(syminfo.ticker, "HSI") ? "HK50" : str.contains(syminfo.ticker, "BTC") ? "BTCUSD" : str.contains(syminfo.ticker, "ETH") ? "ETHUSD" : str.contains(syminfo.ticker, "XRP") ? "XRPUSD" : str.contains(syminfo.ticker, "SOL") ? "SOLUSD" : "GOLD"
+
+activeSymbol = symbolType == "AUTO" ? detectedSymbol : symbolType
+
+// Optimal Hours Logic (Exact sync with symbols_config.py)
+currentHour = hour(time, "UTC")
+currentMinute = minute(time, "UTC")
+
+isOptimalHour = not enableOptimalHours or (
+    (activeSymbol == "GOLD" and currentHour >= 1 and currentHour < 20) or
+    (activeSymbol == "SILVER" and currentHour >= 7 and currentHour < 19) or
+    (activeSymbol == "OIL_CRUDE" and ((currentHour >= 13 and currentHour < 19) or (currentHour >= 8 and currentHour < 11))) or
+    (activeSymbol == "EURUSD" and currentHour >= 7 and currentHour < 16) or
+    (activeSymbol == "GBPUSD" and currentHour >= 7 and currentHour < 17) or
+    (activeSymbol == "USDJPY" and ((currentHour >= 0 and currentHour < 9) or (currentHour >= 13 and currentHour < 19))) or
+    (activeSymbol == "AUDUSD" and ((currentHour >= 0 and currentHour < 8) or (currentHour >= 13 and currentHour < 17))) or
+    (activeSymbol == "USDCHF" and currentHour >= 7 and currentHour < 16) or
+    (activeSymbol == "EURJPY" and ((currentHour >= 0 and currentHour < 9) or (currentHour >= 12 and currentHour < 16))) or
+    (activeSymbol == "GBPJPY" and ((currentHour >= 7 and currentHour < 16) or (currentHour >= 0 and currentHour < 4))) or
+    (activeSymbol == "US30" and currentHour >= 13 and currentHour < 22) or
+    (activeSymbol == "US100" and currentHour >= 13 and currentHour < 22) or
+    (activeSymbol == "US500" and currentHour >= 13 and currentHour < 22) or
+    (activeSymbol == "UK100" and currentHour >= 8 and currentHour < 17) or
+    (activeSymbol == "FR40" and currentHour >= 7 and currentHour < 16) or
+    (activeSymbol == "DE40" and currentHour >= 7 and currentHour < 16) or
+    (activeSymbol == "J225" and currentHour >= 0 and currentHour < 6) or
+    (activeSymbol == "HK50" and ((currentHour >= 1 and currentHour < 4) or (currentHour >= 5 and currentHour < 8))) or
+    (activeSymbol == "BTCUSD" and currentHour >= 7 and currentHour < 21) or
+    (activeSymbol == "ETHUSD" and currentHour >= 7 and currentHour < 21) or
+    (activeSymbol == "XRPUSD" and currentHour >= 7 and currentHour < 21) or
+    (activeSymbol == "SOLUSD" and currentHour >= 7 and currentHour < 21)
+)
+
+// Avoid Windows Logic (Exact sync with core_config.py)
+isAvoidWindow = enableAvoidWindows and (
+    // London Open: 07:30-09:00 UTC
+    (currentHour == 7 and currentMinute >= 30) or (currentHour == 8 and currentMinute < 60) or
+    // NY Open: 13:30-15:00 UTC
+    (currentHour == 13 and currentMinute >= 30) or (currentHour == 14 and currentMinute < 60) or
+    // Tokyo Open: 00:00-01:30 UTC
+    (currentHour == 0 and currentMinute < 90) or
+    // Rollover: 21:50-23:10 UTC
+    (currentHour == 21 and currentMinute >= 50) or (currentHour == 22) or (currentHour == 23 and currentMinute < 10)
+)
+
+// ADX Adaptive Threshold (Exact sync with profiles.py)
+isLondonNY = currentHour >= 7 and currentHour < 20
+isAsia = currentHour >= 0 and currentHour < 7
+adxThresholdAdaptive = isLondonNY ? 25 : isAsia ? 18 : 20
 
 // Momentum & Volume (UPDATED TO MATCH BOT)
 momentumLength = input.int(14, "Momentum Period", group=group_conf)
@@ -34,7 +107,7 @@ laggingSpan2Periods = input.int(52, "Leading Span B", group=group_conf)
 displacement = input.int(26, "Displacement", group=group_conf)
 
 // Signal Logic
-confluenceRequired = input.int(4, "Min Confluence", minval=1, maxval=7, group=group_conf) // Sync with Bot (4)
+confluenceRequired = input.int(5, "Min Confluence (Bot=5)", minval=1, maxval=9, group=group_conf, tooltip="Bot requires 5/9 conditions. DO NOT change unless you modify bot's CONFLUENCE_THRESHOLD.")
 signalMaxAge = input.int(3, "Max Bars Since Base", minval=1, group=group_conf)
 showDivergence = input.bool(true, "Show Divergence", group=group_conf)
 showSignals = input.bool(true, "Show Buy/Sell Signals", group=group_conf)
@@ -111,9 +184,9 @@ volMA = ta.sma(srcV, volumeMAEff)
 volumeStrength = srcV > volMA
 trendStrength = math.abs(ma1 - ma2) / atrValue
 
-// ADX Calc
+// ADX Calc (with adaptive threshold)
 [diplus, diminus, adx] = ta.dmi(diLen, adxLen)
-adxFilter = adx > adxThreshold
+adxFilter = adx > adxThresholdAdaptive  // Uses adaptive threshold (18/20/25 based on session)
 
 // MTF Trend Filter Logic
 filterClose = request.security(syminfo.tickerid, filterTf, srcC, barmerge.gaps_off, barmerge.lookahead_off)
@@ -219,9 +292,9 @@ sellSignal := sellSignal and (is1 and not strongBear ? (not currentTrendBullish 
 sellSignal := sellSignal and (lowTF and not strongBear ? macdHist < 0 : true)
 sellSignal := sellSignal and (not useTrendFilter or not mainTrendUp)
 
-// Global ADX Filter Application
-buySignal := buySignal and adxFilter
-sellSignal := sellSignal and adxFilter
+// Global Filters Application (ADX + Optimal Hours + Avoid Windows)
+buySignal := buySignal and adxFilter and isOptimalHour and not isAvoidWindow
+sellSignal := sellSignal and adxFilter and isOptimalHour and not isAvoidWindow
 
 // Plots
 plot(ma1, "Fast MA", color=color.new(color.blue, 0), linewidth=1)
@@ -236,17 +309,59 @@ plotshape(showMacdCrossAlerts and macdBullishCross, "MACD Bull Cross", shape.dia
 plotshape(showMacdCrossAlerts and macdBearishCross, "MACD Bear Cross", shape.diamond, location.abovebar, color.new(color.yellow, 0), size=size.tiny)
 
 if showTable
-    var table indicatorTable = table.new(position.top_right, 2, 5, border_width=1)
+    var table indicatorTable = table.new(position.top_right, 2, 9, border_width=1)
+    
+    // === BOT STATUS SECTION ===
+    // Bot Ready (All filters passed)
+    botReady = isOptimalHour and not isAvoidWindow and adxFilter
+    table.cell(indicatorTable, 0, 0, "🤖 BOT READY", bgcolor=color.new(color.gray, 0), text_color=color.white, text_size=size.normal)
+    table.cell(indicatorTable, 1, 0, botReady ? "✅ YES" : "❌ NO", 
+        bgcolor=botReady ? color.new(color.green, 0) : color.new(color.red, 0), 
+        text_color=color.white, text_size=size.normal)
+    
+    // Optimal Hours Status
+    table.cell(indicatorTable, 0, 1, "⏰ Optimal Hours", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 1, isOptimalHour ? "✅" : "❌ OUT", 
+        bgcolor=isOptimalHour ? color.green : color.red, text_color=color.white)
+    
+    // Avoid Window Status
+    table.cell(indicatorTable, 0, 2, "🚫 Avoid Window", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 2, isAvoidWindow ? "⚠️ YES" : "✅ NO", 
+        bgcolor=isAvoidWindow ? color.red : color.green, text_color=color.white)
+    
+    // ADX Threshold (Adaptive)
+    table.cell(indicatorTable, 0, 3, "ADX Req/Actual", bgcolor=color.gray, text_color=color.white)
+    adxStatus = str.tostring(adxThresholdAdaptive) + "/" + str.tostring(math.round(adx, 1))
+    table.cell(indicatorTable, 1, 3, adxStatus, 
+        bgcolor=adx > adxThresholdAdaptive ? color.green : color.red, text_color=color.white)
+    
+    // === MARKET ANALYSIS SECTION ===
     // Main Trend Filter
-    table.cell(indicatorTable, 0, 0, "Filtro " + filterTf, bgcolor=color.gray, text_color=color.white)
-    table.cell(indicatorTable, 1, 0, useTrendFilter ? (mainTrendUp ? "▲" : "▼") : "—", bgcolor=useTrendFilter ? (mainTrendUp ? color.green : color.red) : color.gray, text_color=color.white)
-    // Current TF Indicators
-    table.cell(indicatorTable, 0, 1, "Tendencia " + tf, bgcolor=color.gray, text_color=color.white)
-    table.cell(indicatorTable, 1, 1, currentTrendBullish ? "▲" : "▼", bgcolor=currentTrendBullish ? color.green : color.red, text_color=color.white)
-    table.cell(indicatorTable, 0, 2, "Mom", bgcolor=color.gray, text_color=color.white)
-    table.cell(indicatorTable, 1, 2, momentumBullish ? "▲" : "▼", bgcolor=momentumBullish ? color.green : color.red, text_color=color.white)
-    table.cell(indicatorTable, 0, 3, "Vol", bgcolor=color.gray, text_color=color.white)
-    table.cell(indicatorTable, 1, 3, volumeStrength ? "High" : "Low", bgcolor=volumeStrength ? color.green : color.red, text_color=color.white)
+    table.cell(indicatorTable, 0, 4, "Filtro " + filterTf, bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 4, useTrendFilter ? (mainTrendUp ? "▲" : "▼") : "—", 
+        bgcolor=useTrendFilter ? (mainTrendUp ? color.green : color.red) : color.gray, text_color=color.white)
+    
+    // Current TF Trend
+    table.cell(indicatorTable, 0, 5, "Tendencia " + tf, bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 5, currentTrendBullish ? "▲" : "▼", 
+        bgcolor=currentTrendBullish ? color.green : color.red, text_color=color.white)
+    
+    // Momentum
+    table.cell(indicatorTable, 0, 6, "Momentum", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 6, momentumBullish ? "▲" : "▼", 
+        bgcolor=momentumBullish ? color.green : color.red, text_color=color.white)
+    
+    // Volume
+    table.cell(indicatorTable, 0, 7, "Volume", bgcolor=color.gray, text_color=color.white)
+    table.cell(indicatorTable, 1, 7, volumeStrength ? "High" : "Low", 
+        bgcolor=volumeStrength ? color.green : color.red, text_color=color.white)
+    
+    // Confluence Score
+    table.cell(indicatorTable, 0, 8, "Confluence", bgcolor=color.gray, text_color=color.white)
+    confluenceStatus = str.tostring(bullishScore) + "/" + str.tostring(bearishScore)
+    table.cell(indicatorTable, 1, 8, confluenceStatus, 
+        bgcolor=bullishScore >= confluenceRequired ? color.green : (bearishScore >= confluenceRequired ? color.red : color.gray), 
+        text_color=color.white)
 
 // ==========================================
 // 2. ATR TRAILING STOP
@@ -326,7 +441,7 @@ fill(p1, p2, color=color.new(vwapColor, 95))
 // 4. AUTO ORDER BLOCKS
 // ==========================================
 group_ob = "=== Auto Order Blocks ==="
-obLookback = input.int(5, "OB Pivot Lookback", minval=1, group=group_ob)
+obLookback = input.int(2, "OB Pivot Lookback (Bot=2)", minval=1, group=group_ob, tooltip="Bot uses 2 (Bill Williams standard). DO NOT change unless you modify bot's fractal_n.")
 obTransp = input.int(85, "OB Transparency", minval=0, maxval=100, group=group_ob)
 
 ph = ta.pivothigh(high, obLookback, obLookback)

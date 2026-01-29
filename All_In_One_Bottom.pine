@@ -1,5 +1,5 @@
 //@version=6
-indicator("Professional Bottom Combo (MACD + RVOL)", shorttitle="Pro MACD+RVOL")
+indicator("Bot-Synced Bottom Combo (MACD + RVOL)", shorttitle="Bot MACD+RVOL", overlay=false)
 
 // ==========================================
 // 1. PROFESSIONAL RVOL (FONDO)
